@@ -230,11 +230,16 @@ export default function ExamEnvironment() {
             if (session.isActive && session.endTime) {
                 setTimeLeft(Math.max(0, session.endTime - Date.now()));
             }
+
+            // Auto-unfreeze if frozen time is up
+            if (session.isFrozen && session.frozenUntil && Date.now() >= session.frozenUntil) {
+                unfreeze();
+            }
         };
         updateTimer();
         const inv = setInterval(updateTimer, 1000);
         return () => clearInterval(inv);
-    }, [session.isActive, session.endTime]);
+    }, [session.isActive, session.endTime, session.isFrozen, session.frozenUntil, unfreeze]);
 
     // --- DevTools Detection ---
     const [devToolsActive, setDevToolsActive] = useState(false);
@@ -407,11 +412,11 @@ export default function ExamEnvironment() {
                 webcamStreamRef.current = stream;
                 if (videoRef.current) {
                     videoRef.current.srcObject = stream;
-                    videoRef.current.onloadedmetadata = () => videoRef.current.play().catch(() => {});
+                    videoRef.current.onloadedmetadata = () => videoRef.current.play().catch(() => { });
                 }
                 if (webcamVideoRef.current) {
                     webcamVideoRef.current.srcObject = stream;
-                    webcamVideoRef.current.onloadedmetadata = () => webcamVideoRef.current.play().catch(() => {});
+                    webcamVideoRef.current.onloadedmetadata = () => webcamVideoRef.current.play().catch(() => { });
                 }
                 setWebcamStatus('active');
                 updateAI({ webcamActive: true });
@@ -559,8 +564,8 @@ export default function ExamEnvironment() {
     return (
         <div className="relative flex h-screen w-screen flex-col overflow-hidden bg-white text-[#1a1a1a]">
             {/* Permanent Warning Banner */}
-            <div className="h-8 bg-red-600 text-white flex items-center justify-center font-bold text-[10px] tracking-widest uppercase px-4 shrink-0">
-                {`⚠️ SECURE SESSION // AI PROCTORING // COPY-PASTE BLOCKED // TAB SWITCHES BLOCKED`}
+            <div className={`h-8 ${currentExam?.aiProctoringEnabled ? 'bg-red-600' : 'bg-gray-800'} text-white flex items-center justify-center font-bold text-[10px] tracking-widest uppercase px-4 shrink-0`}>
+                {`⚠️ SECURE SESSION // ${currentExam?.aiProctoringEnabled ? 'AI PENALTIES ACTIVE' : 'AI MONITORING ONLY'} // COPY-PASTE BLOCKED // TAB SWITCHES BLOCKED`}
             </div>
 
             <header className="h-[70px] bg-[#fdfdfb] border-b border-[#e0e0d5] px-10 flex items-center justify-between">
@@ -587,11 +592,10 @@ export default function ExamEnvironment() {
                                 <button
                                     key={q.id || i}
                                     onClick={() => switchQuestion(i)}
-                                    className={`px-3 py-2 rounded-t-lg text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap ${
-                                        activeQ === i
-                                            ? 'bg-[#4a7c59] text-white'
-                                            : 'text-gray-400 hover:bg-gray-100'
-                                    }`}
+                                    className={`px-3 py-2 rounded-t-lg text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap ${activeQ === i
+                                        ? 'bg-[#4a7c59] text-white'
+                                        : 'text-gray-400 hover:bg-gray-100'
+                                        }`}
                                 >
                                     Q{i + 1}
                                 </button>
@@ -651,9 +655,8 @@ export default function ExamEnvironment() {
                                             <button
                                                 key={lang.id}
                                                 onClick={() => handleLanguageChange(lang)}
-                                                className={`w-full text-left px-3 py-1.5 text-[11px] hover:bg-[#f0f7f0] transition-all ${
-                                                    selectedLang.id === lang.id ? 'bg-[#e8f5e8] font-bold text-[#4a7c59]' : 'text-gray-700'
-                                                }`}
+                                                className={`w-full text-left px-3 py-1.5 text-[11px] hover:bg-[#f0f7f0] transition-all ${selectedLang.id === lang.id ? 'bg-[#e8f5e8] font-bold text-[#4a7c59]' : 'text-gray-700'
+                                                    }`}
                                             >
                                                 {lang.label}
                                             </button>
@@ -674,11 +677,10 @@ export default function ExamEnvironment() {
                                 {showStdin ? 'HIDE_INPUT' : 'STDIN'}
                             </button>
                             <button
-                                className={`flex items-center gap-1.5 px-4 py-1 rounded text-[10px] font-bold transition-all uppercase ${
-                                    isRunning
-                                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                        : 'bg-[#4a7c59] text-white hover:bg-[#3d664a]'
-                                }`}
+                                className={`flex items-center gap-1.5 px-4 py-1 rounded text-[10px] font-bold transition-all uppercase ${isRunning
+                                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                    : 'bg-[#4a7c59] text-white hover:bg-[#3d664a]'
+                                    }`}
                                 onClick={handleRunCode}
                                 disabled={isRunning}
                             >
@@ -792,6 +794,12 @@ export default function ExamEnvironment() {
                                         {faceCount === 1 ? '1 ✓' : faceCount === 0 ? 'NONE ⚠' : `${faceCount} 🚨`}
                                     </span>
                                 </div>
+                                <div className="flex justify-between text-[10px] pt-1 border-t border-gray-50 mt-2">
+                                    <span className="text-gray-400">AI PENALTIES:</span>
+                                    <span className={`font-black uppercase ${currentExam?.aiProctoringEnabled ? 'text-red-600' : 'text-gray-400'}`}>
+                                        {currentExam?.aiProctoringEnabled ? 'STRICT' : 'DISABLED'}
+                                    </span>
+                                </div>
                                 <div className="flex justify-between text-[10px]">
                                     <span>GAZE:</span>
                                     <span className={`font-bold uppercase ${gazeDir === 'center' ? 'text-[#4a7c59]' : 'text-red-500 animate-pulse'}`}>
@@ -806,7 +814,7 @@ export default function ExamEnvironment() {
                                 </div>
                                 <div className="flex justify-between text-[10px]">
                                     <span>MIC_LEVEL:</span>
-                                    <div className="flex gap-0.5 mt-1">{[1,2,3,4,5,6,7,8,9,10].map(i => <div key={i} className={`h-2 w-1 rounded-full ${i * 10 <= micLevel ? (micLevel > 75 ? 'bg-red-500' : 'bg-[#4a7c59]') : 'bg-gray-100'}`} />)}</div>
+                                    <div className="flex gap-0.5 mt-1">{[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(i => <div key={i} className={`h-2 w-1 rounded-full ${i * 10 <= micLevel ? (micLevel > 75 ? 'bg-red-500' : 'bg-[#4a7c59]') : 'bg-gray-100'}`} />)}</div>
                                 </div>
                                 <div className="flex justify-between text-[10px]">
                                     <span>DEV_TOOLS:</span>
@@ -894,7 +902,7 @@ export default function ExamEnvironment() {
                             </p>
                             <button
                                 className="w-full py-4 bg-[#4a7c59] text-white font-bold rounded-xl hover:bg-[#3d664a] transition-all text-sm uppercase tracking-widest"
-                                onClick={() => document.documentElement.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {})}
+                                onClick={() => document.documentElement.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => { })}
                             >
                                 ENTER_FULLSCREEN_MODE
                             </button>
@@ -917,6 +925,31 @@ export default function ExamEnvironment() {
                             <button disabled={isVerifying} onClick={async () => { setIsVerifying(true); await new Promise(r => setTimeout(r, 1500)); updateAI({ reverifyStatus: 'ok', lastVerification: Date.now() }); setIsVerifying(false); }} className="w-full py-4 bg-[#4a7c59] text-white font-bold rounded-xl hover:bg-[#3d664a] transition-all">
                                 {isVerifying ? 'SYNCING_IDENTITY...' : 'COMMENCE_SCAN'}
                             </button>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Security Freeze Overlay */}
+            <AnimatePresence>
+                {session.isFrozen && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 z-[10005] flex items-center justify-center bg-red-950/90 backdrop-blur-2xl">
+                        <div className="w-[500px] bg-white p-12 rounded-[40px] text-center shadow-2xl border-4 border-red-500">
+                            <Lock size={64} className="text-red-600 mx-auto mb-8" />
+                            <h2 className="text-3xl font-black mb-4 uppercase tracking-tighter text-red-600">PROTOCOL_LOCKED</h2>
+                            <div className="bg-red-50 border border-red-100 p-6 rounded-2xl mb-8">
+                                <div className="text-[10px] font-bold text-red-400 mb-2 uppercase tracking-widest">Violation_Trigger</div>
+                                <p className="text-sm font-bold text-red-900 leading-relaxed mb-4">
+                                    {session.freezeReason || 'Security Alert: Anomalous activity detected in your session node.'}
+                                </p>
+                                <div className="flex justify-between items-center text-[10px] font-bold text-red-400 uppercase">
+                                    <span>Locked Until:</span>
+                                    <span className="font-mono text-red-600">{new Date(session.frozenUntil).toLocaleTimeString()}</span>
+                                </div>
+                            </div>
+                            <div className="text-[10px] text-gray-400 uppercase leading-relaxed font-medium">
+                                The proctoring AI has temporarily suspended your session due to an integrity breach. Please remain in front of the camera. The session will automatically unlock after the cooldown period.
+                            </div>
                         </div>
                     </motion.div>
                 )}

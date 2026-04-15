@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 
 export default function TrainerConsole() {
-    const { user, exams, violations, penaltyConfig, updatePenaltyConfig, createExam, updateExam, deleteExam, logout } = useGuardexStore();
+    const { user, exams, violations, reports, penaltyConfig, updatePenaltyConfig, createExam, updateExam, deleteExam, logout } = useGuardexStore();
     const [activeTab, setActiveTab] = useState('overview');
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [editingExam, setEditingExam] = useState(null);
@@ -25,6 +25,9 @@ export default function TrainerConsole() {
     const emptyExam = {
         title: '', course: '', duration: 60, description: '',
         startTime: '', endTime: '',
+        aiProctoringEnabled: true,
+        subjectFaculty: '',
+        hodInCharge: 'HOD_Computer_Science',
         questions: [{ ...emptyQuestion, id: `q_${Date.now()}` }]
     };
     const [formData, setFormData] = useState({ ...emptyExam });
@@ -44,6 +47,9 @@ export default function TrainerConsole() {
             description: exam.description,
             startTime: exam.startTime ? new Date(exam.startTime).toISOString().slice(0, 16) : '',
             endTime: exam.endTime ? new Date(exam.endTime).toISOString().slice(0, 16) : '',
+            aiProctoringEnabled: exam.aiProctoringEnabled ?? true,
+            subjectFaculty: exam.subjectFaculty || '',
+            hodInCharge: exam.hodInCharge || 'HOD_Computer_Science',
             questions: exam.questions || [{ ...emptyQuestion, id: `q_${Date.now()}` }]
         });
         setShowCreateModal(true);
@@ -137,7 +143,7 @@ export default function TrainerConsole() {
                     {[
                         { id: 'overview', icon: LayoutDashboard, label: 'Live Monitoring' },
                         { id: 'exams', icon: FilePlus, label: 'Assessment Manager' },
-                        { id: 'vault', icon: ShieldAlert, label: 'Integrity Vault' },
+                        { id: 'vault', icon: ShieldAlert, label: 'Escalation Vault' },
                         { id: 'analytics', icon: BarChart3, label: 'Batch Analytics' },
                         { id: 'settings', icon: Settings, label: 'Global Settings' }
                     ].map(item => (
@@ -145,8 +151,8 @@ export default function TrainerConsole() {
                             key={item.id}
                             onClick={() => setActiveTab(item.id)}
                             className={`w-full flex items-center gap-4 px-5 py-4 transition-all rounded-xl ${activeTab === item.id
-                                    ? 'bg-[#4a7c59] text-white font-bold shadow-lg shadow-[#4a7c59]/20'
-                                    : 'text-gray-400 hover:bg-gray-50'
+                                ? 'bg-[#4a7c59] text-white font-bold shadow-lg shadow-[#4a7c59]/20'
+                                : 'text-gray-400 hover:bg-gray-50'
                                 }`}
                         >
                             <item.icon size={20} />
@@ -293,6 +299,11 @@ export default function TrainerConsole() {
                                                     <div className="flex items-center gap-3 mb-3">
                                                         <span className={`px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest ${st.color}`}>{st.label}</span>
                                                         <span className="text-[10px] text-gray-400 font-mono">{exam.id}</span>
+                                                        {exam.aiProctoringEnabled && (
+                                                            <span className="px-2 py-0.5 bg-red-50 text-red-600 text-[8px] font-black rounded uppercase tracking-tighter flex items-center gap-1">
+                                                                <Shield size={8} /> AI_STRICT
+                                                            </span>
+                                                        )}
                                                     </div>
                                                     <h3 className="text-xl font-bold mb-2">{exam.title}</h3>
                                                     <p className="text-sm text-gray-500 leading-relaxed mb-4 max-w-2xl">{exam.description}</p>
@@ -398,17 +409,85 @@ export default function TrainerConsole() {
                             >
                                 <div className="flex justify-between items-end mb-4">
                                     <div>
-                                        <h3 className="text-2xl font-black mb-2 uppercase tracking-tighter">Incident Audit Vault</h3>
-                                        <p className="text-gray-400 text-sm">Review architectural security breaches and manual overrides.</p>
+                                        <h3 className="text-2xl font-black mb-2 uppercase tracking-tighter">Integrity Escalation Vault</h3>
+                                        <p className="text-gray-400 text-sm">Automated reports transmitted to HOD and Subject Faculty regarding critical breaches.</p>
                                     </div>
                                     <div className="flex gap-4">
-                                        <button className="px-6 py-3 bg-white border border-[#e0e0d5] rounded-xl flex items-center gap-3 text-sm font-medium">
-                                            <Download size={18} className="text-[#4a7c59]" /> Export CSV
+                                        <button className="px-6 py-3 bg-white border border-[#e0e0d5] rounded-xl flex items-center gap-3 text-sm font-medium hover:bg-gray-50 transition-all">
+                                            <Download size={18} className="text-[#4a7c59]" /> Export Batch Audit
                                         </button>
                                     </div>
                                 </div>
 
-                                <div className="bg-white rounded-3xl border border-[#e0e0d5] overflow-hidden">
+                                {/* Escalated Reports Feed */}
+                                <div className="space-y-6">
+                                    <h4 className="text-[10px] font-bold text-red-500 uppercase tracking-[0.2em] px-4">CRITICAL_ESCALATIONS_LOG</h4>
+                                    {reports.length > 0 ? (
+                                        reports.map(report => (
+                                            <motion.div
+                                                key={report.id}
+                                                initial={{ opacity: 0, x: -20 }}
+                                                animate={{ opacity: 1, x: 0 }}
+                                                className="bg-white border-2 border-red-100 rounded-3xl p-8 flex items-center justify-between hover:shadow-2xl transition-all relative overflow-hidden"
+                                            >
+                                                <div className="absolute top-0 left-0 w-1.5 h-full bg-red-500" />
+                                                <div className="flex items-center gap-8">
+                                                    <div className="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center text-red-500 shrink-0 border border-red-100">
+                                                        <ShieldAlert size={32} />
+                                                    </div>
+                                                    <div>
+                                                        <div className="flex items-center gap-3 mb-2">
+                                                            <span className="text-sm font-black text-gray-800 uppercase tracking-tight">{report.studentName}</span>
+                                                            <span className="px-3 py-1 bg-red-500 text-white text-[9px] font-black rounded-full uppercase tracking-widest animate-pulse">Critical_Breach</span>
+                                                            <span className="text-[10px] text-gray-400 font-mono italic">{report.id}</span>
+                                                        </div>
+                                                        <div className="grid grid-cols-2 gap-x-10 gap-y-2">
+                                                            <div className="text-xs flex items-center gap-2">
+                                                                <span className="text-gray-400 uppercase font-bold text-[9px] w-20">Student ID:</span>
+                                                                <span className="font-mono text-[#4a7c59] bg-[#4a7c59]/5 px-2 py-0.5 rounded italic">{report.studentId}</span>
+                                                            </div>
+                                                            <div className="text-xs flex items-center gap-2">
+                                                                <span className="text-gray-400 uppercase font-bold text-[9px] w-20">Roll Number:</span>
+                                                                <span className="text-gray-700 font-bold">{report.rollNo}</span>
+                                                            </div>
+                                                            <div className="text-xs flex items-center gap-2">
+                                                                <span className="text-gray-400 uppercase font-bold text-[9px] w-20">Assessment:</span>
+                                                                <span className="text-gray-700">{report.examTitle}</span>
+                                                            </div>
+                                                            <div className="text-xs flex items-center gap-2">
+                                                                <span className="text-gray-400 uppercase font-bold text-[9px] w-20">Violation:</span>
+                                                                <span className="text-red-600 font-black uppercase tracking-tighter">{report.violationType}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex flex-col items-end gap-3 text-right">
+                                                    <div className="flex items-center gap-2 text-[10px] font-bold text-green-600 uppercase">
+                                                        <CheckCircle size={14} />
+                                                        Sent to HOD & Faculty
+                                                    </div>
+                                                    <div className="text-[10px] text-gray-400 font-mono">
+                                                        {new Date(report.timestamp).toLocaleString()}
+                                                    </div>
+                                                    <button className="px-4 py-2 bg-gray-50 hover:bg-gray-100 rounded-xl text-[9px] font-bold uppercase tracking-widest text-gray-500 transition-all flex items-center gap-2">
+                                                        <Eye size={12} /> View Evidence
+                                                    </button>
+                                                </div>
+                                            </motion.div>
+                                        ))
+                                    ) : (
+                                        <div className="bg-white border border-dashed border-[#e0e0d5] rounded-3xl p-16 text-center">
+                                            <ShieldCheck size={48} className="text-green-200 mx-auto mb-6" />
+                                            <div className="text-gray-400 font-bold text-xs uppercase tracking-widest">No Integrity Escalations in Current Audit</div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="mt-12 bg-white rounded-3xl border border-[#e0e0d5] overflow-hidden">
+                                    <div className="px-10 py-6 border-b border-gray-100 bg-gray-50/50">
+                                        <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Secondary Incident Log (Raw Vector Telemetry)</span>
+                                    </div>
                                     <table className="w-full text-sm">
                                         <thead className="bg-gray-50 border-b border-gray-100">
                                             <tr>
@@ -425,8 +504,8 @@ export default function TrainerConsole() {
                                                     <td className="px-10 py-6 font-bold">{v.type.toUpperCase()}</td>
                                                     <td className="px-10 py-6">
                                                         <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${v.severity === 'critical' ? 'bg-red-100 text-red-600' :
-                                                                v.severity === 'high' ? 'bg-orange-100 text-orange-600' :
-                                                                    'bg-blue-100 text-blue-600'
+                                                            v.severity === 'high' ? 'bg-orange-100 text-orange-600' :
+                                                                'bg-blue-100 text-blue-600'
                                                             }`}>
                                                             {v.severity}
                                                         </span>
@@ -658,11 +737,30 @@ export default function TrainerConsole() {
                                                 />
                                             </div>
                                             <div>
+                                                <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2 tracking-widest">Subject Faculty ID *</label>
+                                                <input
+                                                    type="text" required
+                                                    className="w-full bg-gray-50 border border-gray-100 p-3.5 rounded-xl outline-[#4a7c59] text-sm"
+                                                    placeholder="e.g. FAC_DR_SHARMA"
+                                                    value={formData.subjectFaculty} onChange={e => setFormData({ ...formData, subjectFaculty: e.target.value })}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-5">
+                                            <div>
                                                 <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2 tracking-widest">Duration (Minutes) *</label>
                                                 <input
                                                     type="number" required min="5" max="600"
                                                     className="w-full bg-gray-50 border border-gray-100 p-3.5 rounded-xl outline-[#4a7c59] text-sm"
                                                     value={formData.duration} onChange={e => setFormData({ ...formData, duration: parseInt(e.target.value) || 60 })}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-bold uppercase text-gray-400 block mb-2 tracking-widest">HOD ID (Auto-Assigned)</label>
+                                                <input
+                                                    type="text" disabled
+                                                    className="w-full bg-gray-100 border border-gray-100 p-3.5 rounded-xl text-sm italic text-gray-400 cursor-not-allowed"
+                                                    value={formData.hodInCharge}
                                                 />
                                             </div>
                                         </div>
@@ -698,6 +796,31 @@ export default function TrainerConsole() {
                                                     value={formData.endTime} onChange={e => setFormData({ ...formData, endTime: e.target.value })}
                                                 />
                                             </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Security & Proctoring */}
+                                    <div className="space-y-5">
+                                        <div className="text-[10px] font-bold text-[#4a7c59] uppercase tracking-widest flex items-center gap-2">
+                                            <Shield size={12} /> Security & AI Proctoring
+                                        </div>
+                                        <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100 flex items-center justify-between">
+                                            <div>
+                                                <div className="text-sm font-bold flex items-center gap-2">
+                                                    AI Proctoring Penalties
+                                                    <span className="px-2 py-0.5 bg-green-100 text-[#4a7c59] text-[8px] font-black rounded uppercase tracking-tighter">Recommended</span>
+                                                </div>
+                                                <div className="text-xs text-gray-500 mt-1 max-w-md">
+                                                    When enabled, AI will automatically detect multiple faces, no face, or mobile devices and trigger a security freeze on the student's screen.
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setFormData({ ...formData, aiProctoringEnabled: !formData.aiProctoringEnabled })}
+                                                className={`relative w-14 h-7 rounded-full transition-all ${formData.aiProctoringEnabled ? 'bg-[#4a7c59]' : 'bg-gray-300'}`}
+                                            >
+                                                <div className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-all ${formData.aiProctoringEnabled ? 'left-7' : 'left-0.5'}`} />
+                                            </button>
                                         </div>
                                     </div>
 

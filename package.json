@@ -19,7 +19,6 @@
     "chart.js": "^4.5.1",
     "framer-motion": "^12.38.0",
     "jsonwebtoken": "^9.0.3",
-    "lightningcss-win32-x64-msvc": "^1.32.0",
     "lucide-react": "^1.8.0",
     "monaco-editor": "^0.55.1",
     "next": "16.2.3",

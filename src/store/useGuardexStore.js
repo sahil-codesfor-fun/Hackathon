@@ -14,7 +14,6 @@ const useGuardexStore = create(
       isAuthenticated: false,
       currentPage: 'login',
       currentExam: null,
-
       penaltyConfig: {
         maxTabSwitches: 3,
         freezeDuration: 10,
@@ -25,6 +24,7 @@ const useGuardexStore = create(
         eyeTrackingPrecision: 0.8,
         copyPasteBlocked: true,
         rightClickBlocked: true,
+        aiProctoringEnabled: true,
       },
 
       session: {
@@ -51,16 +51,16 @@ const useGuardexStore = create(
           endTime: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
           description: 'Assessment on Pipelining, Instruction Set Architectures, and Memory Hierarchy Optimizations.',
           questions: [
-            { 
-              id: 'q1', 
-              title: 'Pipeline Hazards', 
+            {
+              id: 'q1',
+              title: 'Pipeline Hazards',
               description: 'Explain the three main types of pipeline hazards (Structural, Data, and Control) and provide a technique to mitigate each.',
               marks: 50,
               template: '# Pipeline Hazards Analysis\n# Define the hazards below\n'
             },
-            { 
-              id: 'q2', 
-              title: 'Cache Mapping', 
+            {
+              id: 'q2',
+              title: 'Cache Mapping',
               description: 'Implement a simple direct-mapped cache simulation that tracks hits and misses for a given sequence of memory addresses.',
               marks: 50,
               template: '# Cache Simulation\ndef simulate_cache(addresses, cache_size):\n    # Your code here\n    pass\n'
@@ -109,7 +109,7 @@ const useGuardexStore = create(
       startExam: (examId) => {
         const exam = get().exams.find(e => e.id === examId);
         if (!exam) return;
-        
+
         set({
           currentExam: exam,
           session: {
@@ -205,6 +205,36 @@ const useGuardexStore = create(
             }));
           }
         }
+
+        // --- AI PROCTORING PENALTIES ---
+        const currentExam = state.currentExam;
+        const isAIEnabled = currentExam?.aiProctoringEnabled ?? state.penaltyConfig.aiProctoringEnabled;
+
+        if (isAIEnabled) {
+          if (type === 'multiple_faces' || type === 'phone_detected' || type === 'face_absent_critical') {
+            const currentExam = state.currentExam;
+            const user = state.user;
+
+            // Auto-trigger report for HOD/Faculty on critical AI detections
+            state.sendReport(
+              user.id,
+              user.name,
+              user.rollNo,
+              currentExam.title,
+              type,
+              'critical'
+            );
+
+            set(s => ({
+              session: {
+                ...s.session,
+                isFrozen: true,
+                frozenUntil: Date.now() + (s.penaltyConfig.freezeDuration * 60 * 1000),
+                freezeReason: `Security Pause: ${description}. System locked for investigation. REPORT_SENT_TO_HOD.`
+              }
+            }));
+          }
+        }
       },
 
       unfreeze: () => set(s => ({ session: { ...s.session, isFrozen: false } })),
@@ -246,7 +276,25 @@ const useGuardexStore = create(
         session: { ...s.session, isActive: false, isSubmitted: false, isFrozen: false, marks: 100 },
         violations: [],
         currentPage: 'portal'
-      }))
+      })),
+
+      // --- REPORTING SYSTEM ---
+      reports: [],
+      sendReport: (studentId, studentName, rollNo, examTitle, violationType, severity) => {
+        const newReport = {
+          id: `REP_${Date.now()}`,
+          studentId,
+          studentName,
+          rollNo,
+          examTitle,
+          violationType,
+          severity,
+          timestamp: new Date().toISOString(),
+          status: 'transmitted',
+          recipients: ['HOD_OFFICE', 'SUBJECT_FACULTY']
+        };
+        set(s => ({ reports: [newReport, ...s.reports] }));
+      }
     }),
     {
       name: 'guardex-academic-store',

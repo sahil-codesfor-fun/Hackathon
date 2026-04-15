@@ -1,88 +1,84 @@
-# GUARDEX — AI-Powered Exam Proctoring System 🛡️
+# GUARDEX — AI-Driven Proctoring & Exam Integrity Platform 🛡️
 
-**A Production-Grade Campus Solution for Secure Programming Assessments**
+**A Production-Grade Institutional Solution for Secure Digital Assessments**
 
-GUARDEX is a comprehensive, AI-driven online exam proctoring platform designed to ensure academic integrity in coding examinations. It combines a secure programming environment with real-time AI-powered monitoring, automated penalty enforcement, and a robust administrative command center.
+GUARDEX is a comprehensive, state-of-the-art proctoring platform designed for modern academic environments. It combines high-fidelity AI monitoring with a secure programming workspace and a centralized administrative command center to ensure 100% integrity in high-stakes examinations.
 
 ---
 
-## 🚀 Deployment Instructions
+## 🚀 Key Functional Modules
 
-### 1. Prerequisites
-- **Node.js**: v18.0 or higher
-- **npm**: v9.0 or higher
-- **Browser**: Google Chrome / Microsoft Edge (for Fullscreen API support)
+### 1. Dual-Core AI Proctoring Engine
+*   **Presence Verification**: Uses TensorFlow.js and COCO-SSD models to ensure only the authorized candidate is in front of the camera.
+*   **Multi-Person Detection**: Instantly flags and penalizes sessions if an unauthorized person is detected in the frame.
+*   **Object Identification**: Real-time detection of mobile phones, books, and other prohibited physical notes.
+*   **Gaze & Attention Tracking**: Monitors ocular focus and flags suspicious gaze-away patterns (e.g., looking at external devices).
+*   **Acoustic Security**: Monitors background noise levels and verbal communication spikes via real-time microphone telemetry.
 
-### 2. Installation
-Navigate to the project directory and install dependencies:
+### 2. Faculty-Driven Configuration
+*   **Per-Exam strictness**: Subject Faculty can toggle "AI Proctoring Penalties" on or off for specific assessments.
+*   **Configurable Thresholds**: Global settings allow administrators to adjust tab-switch limits, cooling-off durations, and mark-deduction penalties.
+*   **Subject IDs**: Assessments are categorized by Faculty ID and Course, ensuring departmental alignment.
+
+### 3. Automated Integrity Escalation (The HOD Bridge)
+*   **Critical Incident Reporting**: High-severity breaches (phone detection, multiple faces) automatically generate a transmitted report.
+*   **Multi-Node Notification**: Reports are "sent" to the **Head of Department (HOD)** and the **Subject Faculty** in real-time.
+*   **Unique Identity Enslavement**: Every incident is indexed by a unique Student ID and Roll Number, allowing for simultaneous proctoring of full batches (100+ students) with zero identity collision.
+
+### 4. Secure Programming Workspace (IDE)
+*   **Multi-Language Support**: Integrated compiler for Python, C, C++, Java, JS, and 10+ other languages.
+*   **Hardened Input/Output**: Standard Input (stdin) support with sandboxed execution.
+*   **Plagiarism Prevention**: 
+    *   **Clipboard Lockdown**: Complete blocking of Copy, Paste, and Cut operations.
+    *   **Drag-and-Drop Blocking**: Prevents external code injection.
+    *   **Right-Click Disabled**: Blocks inspect element and developer tool access.
+
+### 5. Browser Lockdown Architecture
+*   **Fullscreen Mandatory**: Exams cannot be taken without active fullscreen focus.
+*   **Tab Switch Jail**: Monitoring of tab switches and window blur events with automated cooldown penalties.
+*   **DevTools Defence**: Sophisticated detection of open developer tools or console inspection windows.
+*   **MacOS/OS Overlay Defence**: Detection of inferred floating overlays used for external communication.
+
+### 6. Administrative Command Center (Trainer_Core)
+*   **Live Node Monitoring**: Real-time grid showing the proctoring status of every active student.
+*   **Escalation Vault**: A dedicated high-priority feed of all reports sent to HOD/Faculty with evidence links.
+*   **Batch Analytics**: High-level overview of class performance and integrity metrics.
+*   **Emergency Freeze**: Global lockdown capability to pause all sessions in the event of a platform-wide breach.
+
+---
+
+## ⚒️ Technical Infrastructure
+
+*   **Frontend**: Next.js 16 (App Router)
+*   **State Management**: Zustand with persistent local-storage integration.
+*   **Computer Vision**: TensorFlow.js (COCO-SSD & MobileNet V2).
+*   **Design System**: Cyber-Academic DS (Vanilla CSS & Framer Motion).
+*   **Reporting**: Automated transmission simulation logic for Faculty/HOD synchronization.
+
+---
+
+## 🛠️ Getting Started
+
+### 1. Installation
 ```bash
-cd guardex
+git clone https://github.com/sahil-codesfor-fun/Hackathon.git
+cd Hackathon
 npm install
 ```
 
-### 3. Execution
-Launch the production-grade development server:
+### 2. Launch
 ```bash
 npm run dev
 ```
-The application will be available at: **[http://localhost:3000](http://localhost:3000)**
+
+### 3. Demo Access
+*   **Student Portal**: Accessible via `student@guardex.edu`
+*   **Admin Console**: Accessible via `admin@guardex.edu`
 
 ---
 
-## 🔑 Access Credentials (DEMO)
-
-| Role | Email | Password | Clearance Level |
-|------|-------|----------|-----------------|
-| **Student** | `student@guardex.edu` | `student123` | L1: Exam Portal |
-| **Admin** | `admin@guardex.edu` | `admin123` | L2: Command Center |
+## 🔒 Security Compliance
+GUARDEX implements non-selectable text and dynamic watermarking (Name/RollNo) on all examination content to prevent data scraping, screen recording, and unauthorized content distribution.
 
 ---
-
-## 🛡️ Core Features (PRD Compliant)
-
-### 1. AI Proctoring Intelligence
-- **Gaze Tracking**: Monitors student attention and flags off-screen focus.
-- **Biometric Re-verification**: Randomly verifies student identity during the session.
-- **Audio Anomaly Detection**: Tracks microphone spikes and flags suspicious noise.
-- **Detection**: Real-time tracking of multiple faces or unauthorized objects.
-
-### 2. Security & Integrity Enclave
-- **Tab Switch Lockdown**: Automated penalty escalation (3 switches = 10m freeze, 5 = zero mark).
-- **Fullscreen Enforcement**: Non-dismissible requirement for exam participation.
-- **Clipboard Blockade**: Hardware-level interception of Copy, Paste, and PrintScreen.
-- **Keyboard Restriction**: Blocks DevTools (F12) and prohibited shortcuts (Ctrl+A, Ctrl+S).
-
-### 3. Dynamic Watermarking
-- **Visible Deterrent**: Dynamic canvas-based watermark on every question showing Student Name, Roll No, and Timestamp to prevent leaks and screen recording.
-
-### 4. Administrative Command Center
-- **Live Node Monitoring**: Real-time grid view of all active student sessions.
-- **Anomaly Vault**: Searchable historical log of all detected violations.
-- **Penalty Core**: Real-time adjustment of proctoring thresholds (freeze duration, switch limits).
-
----
-
-## 🛠️ Technology Stack
-
-- **Framework**: Next.js 16 (App Router)
-- **State Engine**: Zustand (PRD-compliant persistence)
-- **Styling**: Industrial Cyber-Core DS1 (Custom CSS System)
-- **Icons**: Lucide React
-- **Security Logic**: Deep-level Browser API Interception
-
----
-
-## 📋 Role-Based Workflows
-
-### Student Workflow
-1. **Clearance**: Identity verification through the 7-step Permission Wizard.
-2. **Onboarding**: System audit for VMs and prohibited browser extensions.
-3. **Execution**: Coding within the secure IDE with real-time AI feedback.
-
-### Admin Workflow
-1. **Intelligence**: High-level overview of campus integrity metrics.
-2. **Operations**: Real-time monitoring and node management (Freeze/Resume).
-3. **Analytics**: Post-exam violation review and reporting.
-
----
-*Built for GUARDEX — Secure Campus Solutions v2.1.0*
+*Built for Guardex Innovation Labs — Secure Campus Solutions v3.0.0*

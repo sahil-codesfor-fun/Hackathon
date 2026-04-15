@@ -783,6 +783,7 @@ Audit Status: VERIFIED
                                             { key: 'maxTabSwitches', label: 'Tab Switch Limit', desc: 'Max tab switches before screen freeze.', min: 1, max: 20 },
                                             { key: 'maxFullscreenExits', label: 'Fullscreen Exit Limit', desc: 'Max fullscreen exits before auto-submission with zero marks.', min: 1, max: 10 },
                                             { key: 'freezeDuration', label: 'Freeze Duration (min)', desc: 'How long the screen stays frozen after violations.', min: 1, max: 60 },
+                                            { key: 'facePenaltyDuration', label: 'Multiple Face Penalty (min)', desc: 'Screen freeze duration when 2+ faces are detected.', min: 1, max: 10 },
                                             { key: 'zeroMarkThreshold', label: 'Zero Mark Threshold', desc: 'Total violations before automatic zero marks.', min: 1, max: 20 },
                                             { key: 'audioSensitivity', label: 'Audio Sensitivity (dB)', desc: 'Threshold for loud noise detection spikes.', min: 20, max: 150 }
                                         ].map(item => (

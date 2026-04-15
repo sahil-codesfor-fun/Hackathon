@@ -25,6 +25,7 @@ const useGuardexStore = create(
         copyPasteBlocked: true,
         rightClickBlocked: true,
         aiProctoringEnabled: true,
+        facePenaltyDuration: 2,
       },
 
       session: {
@@ -224,6 +225,11 @@ const useGuardexStore = create(
             const currentExam = state.currentExam;
             const user = state.user;
 
+            // 2 min penalty for multiple faces as requested
+            const freezeDuration = type === 'multiple_faces'
+              ? state.penaltyConfig.facePenaltyDuration
+              : state.penaltyConfig.freezeDuration;
+
             // Auto-trigger report for HOD/Faculty on critical AI detections
             state.sendReport(
               user.id,
@@ -238,8 +244,8 @@ const useGuardexStore = create(
               session: {
                 ...s.session,
                 isFrozen: true,
-                frozenUntil: Date.now() + (s.penaltyConfig.freezeDuration * 60 * 1000),
-                freezeReason: `Security Pause: ${description}. System locked for investigation. REPORT_SENT_TO_HOD.`
+                frozenUntil: Date.now() + (freezeDuration * 60 * 1000),
+                freezeReason: `Security Pause: ${description}. System locked for ${freezeDuration} minutes for investigation. REPORT_SENT_TO_HOD.`
               }
             }));
           }

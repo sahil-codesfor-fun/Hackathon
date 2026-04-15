@@ -1,0 +1,42 @@
+{
+  "name": "guardex",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@mediapipe/face_mesh": "^0.4.1633559619",
+    "@monaco-editor/react": "^4.7.0",
+    "@tailwindcss/postcss": "^4.2.2",
+    "@tensorflow-models/coco-ssd": "^2.2.3",
+    "@tensorflow-models/face-landmarks-detection": "^1.0.6",
+    "@tensorflow/tfjs": "^4.22.0",
+    "bcryptjs": "^3.0.3",
+    "chart.js": "^4.5.1",
+    "framer-motion": "^12.38.0",
+    "jsonwebtoken": "^9.0.3",
+    "lightningcss-win32-x64-msvc": "^1.32.0",
+    "lucide-react": "^1.8.0",
+    "monaco-editor": "^0.55.1",
+    "next": "16.2.3",
+    "react": "19.2.4",
+    "react-chartjs-2": "^5.3.1",
+    "react-dom": "19.2.4",
+    "react-hot-toast": "^2.6.0",
+    "recharts": "^3.8.1",
+    "uuid": "^13.0.0",
+    "zustand": "^5.0.12"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.5.0",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.3",
+    "lightningcss": "^1.32.0",
+    "postcss": "^8.5.9",
+    "tailwindcss": "^4.2.2"
+  }
+}

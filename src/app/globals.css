@@ -1,0 +1,131 @@
+@import "tailwindcss";
+
+@theme {
+  --color-sage-dark: #2d3e33;
+  --color-sage-primary: #4a7c59;
+  --color-sage-light: #8da399;
+  --color-beige-bg: #f9f9f6;
+  --color-beige-surface: #ffffff;
+  --color-academic-black: #1a1a1a;
+
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-sans: "Inter", system-ui, sans-serif;
+}
+
+:root {
+  /* ACADEMIC SAGE PALETTE */
+  --gx-main-bg: #f9f9f6;
+  --gx-surface: #ffffff;
+  --gx-primary: #4a7c59;
+  --gx-accent: #8da399;
+  --gx-text-bright: #1a1a1a;
+  --gx-text-dim: #5c5c5c;
+  --gx-border-dim: #e0e0d5;
+  --gx-alert-red: #c94c4c;
+  --gx-hazard-yellow: #d4a017;
+}
+
+body {
+  background-color: var(--gx-main-bg);
+  color: var(--gx-text-bright);
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+}
+
+/* CLEAN ACADEMIC COMPONENTS */
+.gx-panel {
+  background: var(--gx-surface);
+  border: 1px solid var(--gx-border-dim);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+}
+
+.gx-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px 24px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.gx-btn-primary {
+  background: var(--gx-primary);
+  color: white;
+  border: none;
+}
+
+.gx-btn-primary:hover {
+  background: var(--gx-sage-dark);
+  transform: translateY(-1px);
+}
+
+.gx-header {
+  height: 70px;
+  background: var(--gx-surface);
+  border-bottom: 1px solid var(--gx-border-dim);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 40px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.gx-mono {
+  font-family: var(--font-mono);
+}
+
+/* Remove Cyber Effects */
+.gx-scanline,
+.gx-noise,
+.gx-grid-overlay {
+  display: none !important;
+}
+
+/* IDE Integration */
+.gx-ide-container {
+  display: flex;
+  height: calc(100vh - 70px);
+}
+
+.gx-ide-sidebar {
+  width: 400px;
+  border-right: 1px solid var(--gx-border-dim);
+  background: #fafafa;
+  overflow-y: auto;
+}
+
+.gx-ide-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+}
+
+.gx-ide-proctor {
+  width: 350px;
+  border-left: 1px solid var(--gx-border-dim);
+  background: #fdfdfb;
+}
+
+.gx-hud-box {
+  padding: 20px;
+  border-radius: 8px;
+  background: #fafafa;
+  border: 1px solid var(--gx-border-dim);
+}
+
+.gx-hud-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--gx-primary);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}

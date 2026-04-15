@@ -7,13 +7,16 @@ import {
     LogOut, Shield, User, BookOpen, Calendar,
     CheckCircle2, HelpCircle, MessageSquare, History,
     Search, ExternalLink, Camera, X, Award, ShieldCheck,
-    FileSearch, Download, Share2
+    FileSearch, Download, Share2, ArrowLeft
 } from 'lucide-react';
 
 export default function StudentExamPortal() {
-    const { user, exams, setPage, logout, setCurrentExam } = useGuardexStore();
+    const { user, exams, setPage, logout, setCurrentExam, sendTicket } = useGuardexStore();
     const [activeTab, setActiveTab] = useState('assigned');
     const [selectedSubmission, setSelectedSubmission] = useState(null);
+    const [showTicketModal, setShowTicketModal] = useState(false);
+    const [ticketData, setTicketData] = useState({ subject: '', message: '' });
+    const [ticketSuccess, setTicketSuccess] = useState(false);
 
     // Filter exams assigned to this student
     const myExams = exams?.filter(e => e.assignedStudents.includes(user.id)) || [];
@@ -54,9 +57,12 @@ export default function StudentExamPortal() {
             {/* Top Navbar */}
             <header className="h-[80px] bg-white border-b border-[#e0e0d5] px-10 flex items-center justify-between sticky top-0 z-50 shadow-sm shadow-black/[0.02]">
                 <div className="flex items-center gap-6">
-                    <div className="flex items-center gap-2">
-                        <Shield size={24} className="text-[#4a7c59]" />
-                        <span className="font-bold tracking-tight text-lg">GUARDEX</span>
+                    <div className="flex items-center gap-2 group cursor-pointer" onClick={logout}>
+                        <ArrowLeft size={16} className="text-gray-400 group-hover:text-[#4a7c59] transition-colors" />
+                        <div className="flex items-center gap-2">
+                            <Shield size={24} className="text-[#4a7c59]" />
+                            <span className="font-bold tracking-tight text-lg">GUARDEX</span>
+                        </div>
                     </div>
                     <div className="h-6 w-px bg-gray-200" />
                     <nav className="flex gap-8 text-sm font-medium">
@@ -84,7 +90,7 @@ export default function StudentExamPortal() {
                 <div className="flex items-center gap-6">
                     <div className="text-right">
                         <div className="text-sm font-bold uppercase tracking-tight">{user?.name}</div>
-                        <div className="text-[10px] text-gray-400 font-mono italic">SECURE_LEVEL_1 // {user?.rollNo}</div>
+                        <div className="text-[10px] text-gray-400 font-mono italic">{user?.email} // {user?.rollNo}</div>
                     </div>
                     <button
                         onClick={logout}
@@ -177,8 +183,11 @@ export default function StudentExamPortal() {
                                         {pastSubmissions.map(s => (
                                             <tr key={s.id} className="hover:bg-gray-50/50 transition-colors group">
                                                 <td className="px-8 py-6">
-                                                    <div className="font-bold">{s.title}</div>
-                                                    <div className="text-[10px] text-gray-400 font-mono italic">{s.id}</div>
+                                                    <div>
+                                                        <div className="text-xs font-bold">{user?.name}</div>
+                                                        <div className="text-[9px] text-gray-400 font-mono lower-case lowercase truncate max-w-[150px]">{user?.email}</div>
+                                                        <div className="text-[10px] text-gray-400 uppercase tracking-tighter mt-1">{user?.role === 'admin' ? (user.name.includes('HOD') ? 'Academic Head' : 'Subject Faculty') : 'Academic Head'}</div>
+                                                    </div>
                                                 </td>
                                                 <td className="px-8 py-6 font-bold text-xl">{s.score}/100</td>
                                                 <td className="px-8 py-6 text-sm text-gray-500">{s.date}</td>
@@ -241,7 +250,10 @@ export default function StudentExamPortal() {
                                         <div className="text-white/60 text-sm">Escalate suspicious flags or request manual review.</div>
                                     </div>
                                 </div>
-                                <button className="px-8 py-4 bg-white text-[#4a7c59] font-bold rounded-xl hover:bg-gray-50 transition-all">
+                                <button
+                                    onClick={() => setShowTicketModal(true)}
+                                    className="px-8 py-4 bg-white text-[#4a7c59] font-bold rounded-xl hover:bg-gray-50 transition-all"
+                                >
                                     Open Support Ticket
                                 </button>
                             </div>
@@ -337,6 +349,64 @@ export default function StudentExamPortal() {
                                     </button>
                                 </div>
                             </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Support Ticket Modal */}
+            <AnimatePresence>
+                {showTicketModal && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/40 backdrop-blur-sm p-6">
+                        <motion.div initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} className="bg-white w-[500px] rounded-[30px] shadow-2xl overflow-hidden p-10 border border-[#e0e0d5]">
+                            <div className="flex justify-between items-center mb-8">
+                                <h3 className="text-2xl font-bold tracking-tight">Institutional Support</h3>
+                                <button onClick={() => { setShowTicketModal(false); setTicketSuccess(false); }} className="text-gray-400 hover:text-black"><X size={20} /></button>
+                            </div>
+
+                            {ticketSuccess ? (
+                                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-10">
+                                    <div className="w-16 h-16 bg-green-50 text-[#4a7c59] rounded-2xl flex items-center justify-center mx-auto mb-6">
+                                        <CheckCircle2 size={32} />
+                                    </div>
+                                    <h4 className="text-lg font-bold mb-2">Ticket Dispatched</h4>
+                                    <p className="text-gray-500 text-sm">Your request has been routed to the academic helpdesk. Node ID: {Math.random().toString(36).substr(2, 6).toUpperCase()}</p>
+                                    <button onClick={() => setShowTicketModal(false)} className="mt-8 px-8 py-3 bg-[#4a7c59] text-white font-bold rounded-xl">Dismiss</button>
+                                </motion.div>
+                            ) : (
+                                <form onSubmit={(e) => {
+                                    e.preventDefault();
+                                    sendTicket(ticketData.subject, ticketData.message);
+                                    setTicketSuccess(true);
+                                    setTicketData({ subject: '', message: '' });
+                                }}>
+                                    <div className="space-y-6">
+                                        <div>
+                                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 block">Subject</label>
+                                            <input
+                                                type="text" required
+                                                className="w-full bg-gray-50 border border-gray-100 p-4 rounded-xl outline-[#4a7c59] text-sm"
+                                                placeholder="e.g. Webcam Initialization Failure"
+                                                value={ticketData.subject}
+                                                onChange={e => setTicketData({ ...ticketData, subject: e.target.value })}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 block">Detailed Description</label>
+                                            <textarea
+                                                required
+                                                className="w-full bg-gray-50 border border-gray-100 p-4 rounded-xl outline-[#4a7c59] text-sm h-32 resize-none"
+                                                placeholder="Please provide specific node errors or symptoms..."
+                                                value={ticketData.message}
+                                                onChange={e => setTicketData({ ...ticketData, message: e.target.value })}
+                                            />
+                                        </div>
+                                        <button className="w-full py-4 bg-[#4a7c59] text-white font-bold rounded-xl shadow-lg shadow-[#4a7c59]/10">
+                                            Escalate to Admin
+                                        </button>
+                                    </div>
+                                </form>
+                            )}
                         </motion.div>
                     </motion.div>
                 )}

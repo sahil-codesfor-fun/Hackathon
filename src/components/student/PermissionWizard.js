@@ -76,8 +76,8 @@ export default function PermissionWizard() {
                         {STEPS.map((step, idx) => (
                             <div key={step.id} className="flex items-center gap-4">
                                 <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-[10px] font-bold transition-all ${idx < currentStep ? 'bg-[#4a7c59] border-[#4a7c59] text-white' :
-                                        idx === currentStep ? 'border-[#4a7c59] text-[#4a7c59] shadow-[0_0_10px_rgba(74,124,89,0.2)]' :
-                                            'border-gray-200 text-gray-300'
+                                    idx === currentStep ? 'border-[#4a7c59] text-[#4a7c59] shadow-[0_0_10px_rgba(74,124,89,0.2)]' :
+                                        'border-gray-200 text-gray-300'
                                     }`}>
                                     {idx < currentStep ? <CheckCircle size={14} /> : idx + 1}
                                 </div>
@@ -167,8 +167,18 @@ export default function PermissionWizard() {
                             </div>
 
                             <div className="flex justify-between items-center">
-                                <div className="text-[10px] text-gray-300 font-mono italic">
-                                    Node_Fingerprint: GX-S_2411
+                                <div className="flex gap-4">
+                                    {currentStep > 0 && (
+                                        <button
+                                            onClick={() => setCurrentStep(currentStep - 1)}
+                                            className="px-6 py-4 bg-gray-100 text-gray-500 font-bold rounded-xl hover:bg-gray-200 transition-all text-xs uppercase tracking-widest"
+                                        >
+                                            Previous Step
+                                        </button>
+                                    )}
+                                    <div className="text-[10px] text-gray-300 font-mono italic flex items-center">
+                                        Node_Fingerprint: GX-S_2411
+                                    </div>
                                 </div>
                                 {(status[stepData.id] === 'success' || ['system', 'face', 'env', 'rules'].includes(stepData.id)) && (
                                     <button

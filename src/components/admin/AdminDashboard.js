@@ -9,16 +9,24 @@ import {
     ShieldAlert, Activity, LayoutDashboard, LogOut,
     FileText, Lock, Eye, Download, Edit3, Calendar,
     UserX, UserCheck, X, GripVertical, AlertTriangle,
-    CheckCircle, BookOpen, Code2, Hash
+    CheckCircle, BookOpen, Code2, Hash, ArrowLeft, Shield, MessageSquare, ClipboardList, Trophy, Mail, User
 } from 'lucide-react';
 
 export default function TrainerConsole() {
-    const { user, exams, violations, reports, penaltyConfig, updatePenaltyConfig, createExam, updateExam, deleteExam, logout } = useGuardexStore();
+    const {
+        user, exams, violations, reports, tickets, submissions,
+        penaltyConfig, updatePenaltyConfig, createExam, updateExam, deleteExam, logout, resolveReport, unfreezeStudent
+    } = useGuardexStore();
+    const [selectedReport, setSelectedReport] = useState(null);
     const [activeTab, setActiveTab] = useState('overview');
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [editingExam, setEditingExam] = useState(null);
     const [expandedExam, setExpandedExam] = useState(null);
     const [deleteConfirm, setDeleteConfirm] = useState(null);
+    const [showNotifications, setShowNotifications] = useState(false);
+    const [lastReadReportCount, setLastReadReportCount] = useState(reports.length);
+    const [selectedSubmission, setSelectedSubmission] = useState(null);
+    const unreadCount = Math.max(0, reports.length - lastReadReportCount);
 
     // ─── Exam Form State ───
     const emptyQuestion = { id: '', title: '', description: '', marks: 10, template: '' };
@@ -129,6 +137,52 @@ export default function TrainerConsole() {
         return new Date(iso).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
     };
 
+    const handleExport = () => {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(submissions));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", "academic_records.json");
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+    };
+
+    const handleExportReports = () => {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(reports));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", "incident_reports.json");
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+    };
+
+    const handleDownloadTranscript = (sub) => {
+        const transcriptText = `
+GUARDEX ACADEMIC TRANSCRIPT
+===========================
+Candidate: ${sub.studentName}
+Roll No: ${sub.rollNo}
+Exam: ${sub.examTitle}
+Date: ${new Date(sub.timestamp).toLocaleString()}
+
+Final Score: ${sub.score} / ${sub.totalMarks}
+Integrity Incidents: ${sub.violations}
+
+RESPONSES:
+${Object.entries(sub.answers).map(([qId, ans]) => `\nQuestion ${qId}:\n${ans}\n-------------------`).join('\n')}
+
+Audit Status: VERIFIED
+        `;
+        const dataStr = "data:text/plain;charset=utf-8," + encodeURIComponent(transcriptText);
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", `transcript_${sub.studentName.replace(/\s+/g, '_')}.txt`);
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+    };
+
     return (
         <div className="flex h-screen bg-[#f9f9f6] text-[#1a1a1a] font-sans overflow-hidden">
 
@@ -144,7 +198,10 @@ export default function TrainerConsole() {
                         { id: 'overview', icon: LayoutDashboard, label: 'Live Monitoring' },
                         { id: 'exams', icon: FilePlus, label: 'Assessment Manager' },
                         { id: 'vault', icon: ShieldAlert, label: 'Escalation Vault' },
+                        { id: 'submissions', icon: ClipboardList, label: 'Academic Records' },
+                        { id: 'leaderboard', icon: Trophy, label: 'Leaderboard' },
                         { id: 'analytics', icon: BarChart3, label: 'Batch Analytics' },
+                        { id: 'tickets', icon: MessageSquare, label: 'Support Desk' },
                         { id: 'settings', icon: Settings, label: 'Global Settings' }
                     ].map(item => (
                         <button
@@ -171,9 +228,14 @@ export default function TrainerConsole() {
                             <div className="text-[10px] text-gray-400 uppercase tracking-tighter">Academic Head</div>
                         </div>
                     </div>
-                    <button onClick={logout} className="w-full flex items-center justify-center gap-2 py-2.5 text-xs font-bold text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition-colors">
-                        <LogOut size={14} /> TERMINATE_SESSION
-                    </button>
+                    <div className="flex flex-col gap-2">
+                        <button onClick={logout} className="w-full flex items-center justify-center gap-2 py-2.5 text-xs font-bold text-gray-400 bg-gray-50 border border-gray-100 rounded-lg hover:bg-gray-100 transition-colors uppercase">
+                            <ArrowLeft size={14} /> Return to Gateway
+                        </button>
+                        <button onClick={logout} className="w-full flex items-center justify-center gap-2 py-2.5 text-xs font-bold text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition-colors">
+                            <LogOut size={14} /> TERMINATE_SESSION
+                        </button>
+                    </div>
                 </div>
             </aside>
 
@@ -187,7 +249,66 @@ export default function TrainerConsole() {
                         {activeTab.replace('_', ' ')}
                     </h2>
                     <div className="flex items-center gap-6">
-                        <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-lg text-[10px] font-bold text-gray-400 uppercase">
+                        {/* Notification Center */}
+                        <div className="relative">
+                            <button
+                                onClick={() => { setShowNotifications(!showNotifications); setLastReadReportCount(reports.length); }}
+                                className="p-3 bg-gray-50 rounded-2xl hover:bg-gray-100 transition-all relative group"
+                            >
+                                <Activity size={20} className={unreadCount > 0 ? "text-red-500" : "text-gray-400"} />
+                                {unreadCount > 0 && (
+                                    <span className="absolute top-2 right-2 w-4 h-4 bg-red-500 text-white text-[8px] font-black rounded-full flex items-center justify-center border-2 border-white animate-bounce">
+                                        {unreadCount}
+                                    </span>
+                                )}
+                            </button>
+
+                            <AnimatePresence>
+                                {showNotifications && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                                        className="absolute right-0 mt-4 w-[350px] bg-white rounded-3xl shadow-2xl border border-gray-100 z-[1000] overflow-hidden"
+                                    >
+                                        <div className="p-5 border-b border-gray-50 bg-gray-50/50 flex items-center justify-between">
+                                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Incident_Stream</span>
+                                            <button onClick={() => setShowNotifications(false)} className="text-gray-300 hover:text-gray-600"><X size={14} /></button>
+                                        </div>
+                                        <div className="max-h-[400px] overflow-y-auto">
+                                            {reports.length > 0 ? (
+                                                [...reports].reverse().map(report => (
+                                                    <div key={report.id} className="p-5 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => { setSelectedReport(report); setShowNotifications(false); }}>
+                                                        <div className="flex items-center gap-3 mb-2">
+                                                            <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                                                            <span className="text-[10px] font-black uppercase text-red-500">{report.violationType}</span>
+                                                            <span className="text-[8px] font-mono text-gray-400 ml-auto">{new Date(report.timestamp).toLocaleTimeString()}</span>
+                                                        </div>
+                                                        <div className="text-xs font-bold text-gray-800 mb-1">{report.studentName}</div>
+                                                        <div className="text-[9px] text-gray-400 font-mono tracking-tighter">{report.examTitle}</div>
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <div className="p-10 text-center">
+                                                    <Shield size={32} className="mx-auto mb-3 text-gray-100" />
+                                                    <p className="text-[10px] font-bold text-gray-400 uppercase">Clear_Skies // No Alerts</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                        {reports.length > 0 && (
+                                            <button
+                                                onClick={() => { setActiveTab('vault'); setShowNotifications(false); }}
+                                                className="w-full p-4 text-[10px] font-bold text-[#4a7c59] uppercase tracking-widest bg-gray-50 hover:bg-gray-100 transition-all border-t border-gray-100"
+                                            >
+                                                Open Escalation Vault
+                                            </button>
+                                        )}
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+
+                        <div className="flex items-center gap-4 bg-gray-50 px-5 py-2.5 rounded-2xl border border-gray-100 group hover:border-[#4a7c59]/20 transition-all">
                             System_Status: <span className="text-green-500">Operational</span>
                         </div>
                         <button
@@ -413,7 +534,10 @@ export default function TrainerConsole() {
                                         <p className="text-gray-400 text-sm">Automated reports transmitted to HOD and Subject Faculty regarding critical breaches.</p>
                                     </div>
                                     <div className="flex gap-4">
-                                        <button className="px-6 py-3 bg-white border border-[#e0e0d5] rounded-xl flex items-center gap-3 text-sm font-medium hover:bg-gray-50 transition-all">
+                                        <button
+                                            onClick={handleExportReports}
+                                            className="px-6 py-3 bg-white border border-[#e0e0d5] rounded-xl flex items-center gap-3 text-sm font-medium hover:bg-gray-50 transition-all"
+                                        >
                                             <Download size={18} className="text-[#4a7c59]" /> Export Batch Audit
                                         </button>
                                     </div>
@@ -470,57 +594,114 @@ export default function TrainerConsole() {
                                                     <div className="text-[10px] text-gray-400 font-mono">
                                                         {new Date(report.timestamp).toLocaleString()}
                                                     </div>
-                                                    <button className="px-4 py-2 bg-gray-50 hover:bg-gray-100 rounded-xl text-[9px] font-bold uppercase tracking-widest text-gray-500 transition-all flex items-center gap-2">
-                                                        <Eye size={12} /> View Evidence
+                                                    <button
+                                                        onClick={() => resolveReport(report.id)}
+                                                        className="px-4 py-2 bg-gray-50 hover:bg-gray-100 rounded-xl text-[9px] font-bold uppercase tracking-widest text-[#4a7c59] transition-all flex items-center gap-2 border border-transparent hover:border-[#4a7c59]/20"
+                                                    >
+                                                        <button className="text-[10px] text-gray-400 hover:text-black font-bold uppercase tracking-widest">Mark as Resolved</button>
                                                     </button>
                                                 </div>
                                             </motion.div>
                                         ))
                                     ) : (
                                         <div className="bg-white border border-dashed border-[#e0e0d5] rounded-3xl p-16 text-center">
-                                            <ShieldCheck size={48} className="text-green-200 mx-auto mb-6" />
-                                            <div className="text-gray-400 font-bold text-xs uppercase tracking-widest">No Integrity Escalations in Current Audit</div>
+                                            <MessageSquare size={48} className="text-gray-100 mx-auto mb-6" />
+                                            <div className="text-gray-400 font-bold text-xs uppercase tracking-widest">No active technical support requests.</div>
                                         </div>
                                     )}
                                 </div>
+                            </motion.div>
+                        )}
 
-                                <div className="mt-12 bg-white rounded-3xl border border-[#e0e0d5] overflow-hidden">
-                                    <div className="px-10 py-6 border-b border-gray-100 bg-gray-50/50">
-                                        <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Secondary Incident Log (Raw Vector Telemetry)</span>
+                        {activeTab === 'leaderboard' && (
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                                <div className="flex justify-between items-end mb-8">
+                                    <div>
+                                        <h2 className="text-4xl font-black uppercase tracking-tighter">Academic Merit Board</h2>
+                                        <p className="text-gray-400 mt-2">Real-time performance ranking based on score precision and integrity metrics.</p>
                                     </div>
+                                    <div className="flex gap-4">
+                                        <div className="px-6 py-3 bg-[#4a7c59] text-white rounded-2xl text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-[#4a7c59]/20">
+                                            Total Candidates: {submissions.length}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Class-wise Summary Stats */}
+                                <div className="grid grid-cols-4 gap-6 mb-8">
+                                    <div className="bg-[#4a7c59]/5 border border-[#4a7c59]/20 p-6 rounded-3xl">
+                                        <div className="text-[10px] font-bold text-[#4a7c59] uppercase tracking-widest mb-1">Class Average</div>
+                                        <div className="text-2xl font-black">{submissions.length > 0 ? (submissions.reduce((s, a) => s + a.score, 0) / submissions.length).toFixed(1) : '0.0'}</div>
+                                    </div>
+                                    <div className="bg-blue-50 border border-blue-100 p-6 rounded-3xl">
+                                        <div className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-1">Highest Score</div>
+                                        <div className="text-2xl font-black">{submissions.length > 0 ? Math.max(...submissions.map(s => s.score)) : '0'}</div>
+                                    </div>
+                                    <div className="bg-orange-50 border border-orange-100 p-6 rounded-3xl">
+                                        <div className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-1">Integrity Rate</div>
+                                        <div className="text-2xl font-black">{submissions.length > 0 ? (submissions.filter(s => (typeof s.violations === 'object' ? s.violations.length : s.violations) < 3).length / submissions.length * 100).toFixed(0) : '100'}%</div>
+                                    </div>
+                                    <div className="bg-red-50 border border-red-100 p-6 rounded-3xl">
+                                        <div className="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-1">Flagged Nodes</div>
+                                        <div className="text-2xl font-black">{submissions.filter(s => (typeof s.violations === 'object' ? s.violations.length : s.violations) > 5).length}</div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-white rounded-[40px] border border-[#e0e0d5] overflow-hidden shadow-sm">
                                     <table className="w-full text-sm">
                                         <thead className="bg-gray-50 border-b border-gray-100">
                                             <tr>
-                                                <th className="px-10 py-5 text-left text-[10px] font-bold text-gray-400 uppercase">Violation Node</th>
-                                                <th className="px-10 py-5 text-left text-[10px] font-bold text-gray-400 uppercase">Severity</th>
-                                                <th className="px-10 py-5 text-left text-[10px] font-bold text-gray-400 uppercase">Detection Vector</th>
-                                                <th className="px-10 py-5 text-left text-[10px] font-bold text-gray-400 uppercase">Timestamp</th>
-                                                <th className="px-10 py-5"></th>
+                                                <th className="px-10 py-6 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Rank</th>
+                                                <th className="px-10 py-6 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Candidate</th>
+                                                <th className="px-10 py-6 text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest">Score</th>
+                                                <th className="px-10 py-6 text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest">Integrity Node</th>
+                                                <th className="px-10 py-6 text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-50">
-                                            {violations.length > 0 ? violations.map(v => (
-                                                <tr key={v.id} className="hover:bg-red-50/30 transition-colors">
-                                                    <td className="px-10 py-6 font-bold">{v.type.toUpperCase()}</td>
-                                                    <td className="px-10 py-6">
-                                                        <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${v.severity === 'critical' ? 'bg-red-100 text-red-600' :
-                                                            v.severity === 'high' ? 'bg-orange-100 text-orange-600' :
-                                                                'bg-blue-100 text-blue-600'
-                                                            }`}>
-                                                            {v.severity}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-10 py-6 text-gray-500">{v.description}</td>
-                                                    <td className="px-10 py-6 text-[10px] text-gray-400 font-mono italic">{new Date(v.timestamp).toLocaleTimeString()}</td>
-                                                    <td className="px-10 py-6 text-right"><Eye size={18} className="text-gray-300 cursor-pointer hover:text-black" /></td>
-                                                </tr>
-                                            )) : (
+                                            {[...submissions]
+                                                .sort((a, b) => {
+                                                    if (b.score !== a.score) return b.score - a.score;
+                                                    const vA = typeof a.violations === 'object' ? a.violations.length : (a.violations || 0);
+                                                    const vB = typeof b.violations === 'object' ? b.violations.length : (b.violations || 0);
+                                                    return vA - vB;
+                                                })
+                                                .map((sub, idx) => {
+                                                    const vCount = typeof sub.violations === 'object' ? sub.violations.length : (sub.violations || 0);
+                                                    return (
+                                                        <tr key={sub.id} className={`${idx < 3 ? 'bg-yellow-50/20' : ''} hover:bg-gray-50/50 transition-all`}>
+                                                            <td className="px-10 py-6">
+                                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-xs ${idx === 0 ? 'bg-yellow-400 text-white shadow-lg' :
+                                                                    idx === 1 ? 'bg-gray-300 text-white' :
+                                                                        idx === 2 ? 'bg-orange-400 text-white' : 'bg-gray-50 text-gray-400'
+                                                                    }`}>
+                                                                    {idx + 1}
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-10 py-6">
+                                                                <div className="font-bold text-gray-800">{sub.studentName}</div>
+                                                                <div className="text-[10px] text-gray-400 font-mono mt-1 italic">{sub.rollNo}</div>
+                                                            </td>
+                                                            <td className="px-10 py-6 text-center">
+                                                                <div className="text-lg font-black text-[#4a7c59]">{sub.score}</div>
+                                                                <div className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">Total_Merit</div>
+                                                            </td>
+                                                            <td className="px-10 py-6 text-center">
+                                                                <div className={`text-xs font-bold ${vCount > 5 ? 'text-red-500' : 'text-gray-400'}`}>
+                                                                    {vCount} Violation{vCount !== 1 ? 's' : ''}
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-10 py-6 text-center">
+                                                                <div className="px-3 py-1 bg-green-100 text-green-600 text-[10px] font-black rounded-full uppercase inline-block">Verified</div>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            {submissions.length === 0 && (
                                                 <tr>
-                                                    <td colSpan="5" className="px-10 py-20 text-center">
-                                                        <div className="flex flex-col items-center gap-4">
-                                                            <ShieldCheck size={48} className="text-green-200" />
-                                                            <div className="text-gray-400 font-bold uppercase tracking-widest text-xs">No Integrity Violations Detected in Active Cycle</div>
-                                                        </div>
+                                                    <td colSpan="5" className="py-20 text-center">
+                                                        <Trophy size={48} className="text-gray-100 mx-auto mb-4" />
+                                                        <div className="text-gray-400 font-bold uppercase tracking-widest text-xs">No submission data available for ranking.</div>
                                                     </td>
                                                 </tr>
                                             )}
@@ -541,24 +722,28 @@ export default function TrainerConsole() {
                                             <UserCheck size={32} />
                                         </div>
                                         <h4 className="font-bold text-xl mb-2">Class Confidence</h4>
-                                        <div className="text-3xl font-black text-[#4a7c59] mb-4">98.2%</div>
-                                        <p className="text-gray-400 text-xs text-balance px-4 leading-relaxed">98.2% of sessions completed without high-severity flags.</p>
+                                        <div className="text-3xl font-black text-[#4a7c59] mb-4">
+                                            {submissions.length > 0 ? (submissions.filter(s => (typeof s.violations === 'object' ? s.violations.length : s.violations) < 5).length / submissions.length * 100).toFixed(1) : '100'}%
+                                        </div>
+                                        <p className="text-gray-400 text-xs text-balance px-4 leading-relaxed">Percentage of sessions completed without high-severity flags.</p>
                                     </div>
                                     <div className="bg-white p-10 rounded-3xl border border-[#e0e0d5] flex flex-col items-center text-center">
                                         <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-500 mb-6">
                                             <Clock size={32} />
                                         </div>
-                                        <h4 className="font-bold text-xl mb-2">Avg. Completion</h4>
-                                        <div className="text-3xl font-black text-blue-500 mb-4">52 min</div>
-                                        <p className="text-gray-400 text-xs px-4 leading-relaxed">Average time taken to submit the assessment module.</p>
+                                        <h4 className="font-bold text-xl mb-2">Total Submissions</h4>
+                                        <div className="text-3xl font-black text-blue-500 mb-4">{submissions.length}</div>
+                                        <p className="text-gray-400 text-xs px-4 leading-relaxed">Total assessment modules received and archived in the repository.</p>
                                     </div>
                                     <div className="bg-white p-10 rounded-3xl border border-[#e0e0d5] flex flex-col items-center text-center">
                                         <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center text-red-500 mb-6">
                                             <UserX size={32} />
                                         </div>
-                                        <h4 className="font-bold text-xl mb-2">Zero Marked</h4>
-                                        <div className="text-3xl font-black text-red-500 mb-4">2</div>
-                                        <p className="text-gray-400 text-xs px-4 leading-relaxed">Candidates automatically disqualified by protocol.</p>
+                                        <h4 className="font-bold text-xl mb-2">Critical Flagged</h4>
+                                        <div className="text-3xl font-black text-red-500 mb-4">
+                                            {submissions.filter(s => s.score === 0 || (typeof s.violations === 'object' ? s.violations.length : s.violations) > 8).length}
+                                        </div>
+                                        <p className="text-gray-400 text-xs px-4 leading-relaxed">Candidates automatically flagged for manual review or zeroed by protocol.</p>
                                     </div>
                                 </div>
 
@@ -657,6 +842,141 @@ export default function TrainerConsole() {
                                     <button className="px-8 py-4 bg-red-500 text-white font-bold rounded-2xl hover:bg-red-600 transition-all shadow-xl shadow-red-500/10 uppercase text-xs tracking-widest">
                                         Emergency_Freeze
                                     </button>
+                                </div>
+                            </motion.div>
+                        )}
+                        {activeTab === 'submissions' && (
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                                <div className="flex justify-between items-center mb-10">
+                                    <div>
+                                        <h2 className="text-4xl font-black uppercase tracking-tighter">Academic Records Hub</h2>
+                                        <p className="text-gray-400 mt-2">Centralized repository for all completed assessments and neural audit logs.</p>
+                                    </div>
+                                    <div className="flex gap-4">
+                                        <button
+                                            onClick={handleExport}
+                                            className="px-6 py-3 bg-white border border-gray-100 rounded-2xl text-[10px] font-bold text-gray-400 uppercase tracking-widest hover:bg-gray-50 transition-all flex items-center gap-3"
+                                        >
+                                            <Download size={16} /> Export Master Ledger
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="bg-white rounded-[40px] border border-[#e0e0d5] overflow-hidden shadow-sm">
+                                    <table className="w-full text-sm">
+                                        <thead className="bg-gray-50/50 border-b border-gray-100">
+                                            <tr>
+                                                <th className="px-10 py-6 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Candidate Node</th>
+                                                <th className="px-10 py-6 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Assessment Module</th>
+                                                <th className="px-10 py-6 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">Final Score</th>
+                                                <th className="px-10 py-6 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">Integrity Incidents</th>
+                                                <th className="px-10 py-6 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest text-right">Submission Node</th>
+                                                <th className="px-10 py-6"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-50">
+                                            {submissions.length > 0 ? (
+                                                [...submissions].reverse().map(sub => (
+                                                    <tr key={sub.id} className="hover:bg-gray-50/50 transition-all group">
+                                                        <td className="px-10 py-6">
+                                                            <div className="font-bold text-gray-800">{sub.studentName}</div>
+                                                            <div className="text-[10px] text-gray-400 font-mono mt-1 italic">{sub.rollNo}</div>
+                                                        </td>
+                                                        <td className="px-10 py-6">
+                                                            <div className="text-xs font-medium text-gray-600">{sub.examTitle}</div>
+                                                            <div className="text-[9px] text-gray-400 mt-1 uppercase tracking-tighter">Node ID: {sub.examId}</div>
+                                                        </td>
+                                                        <td className="px-10 py-6 text-center">
+                                                            <div className={`text-lg font-black ${sub.score < 40 ? 'text-red-500' : 'text-[#4a7c59]'}`}>
+                                                                {sub.score}/{sub.totalMarks}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-10 py-6 text-center">
+                                                            <div className={`px-3 py-1 rounded-full text-[10px] font-bold inline-block ${(sub.violations?.length || sub.violations || 0) > 5 ? 'bg-red-50 text-red-600' : 'bg-gray-50 text-gray-400'}`}>
+                                                                {typeof sub.violations === 'object' ? sub.violations.length : (sub.violations || 0)} Detection{(typeof sub.violations === 'object' ? sub.violations.length : sub.violations) !== 1 ? 's' : ''}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-10 py-6 text-right font-mono text-[11px] text-gray-400">
+                                                            {new Date(sub.timestamp).toLocaleDateString()} <br /> {new Date(sub.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                        </td>
+                                                        <td className="px-10 py-6 text-right">
+                                                            <button
+                                                                onClick={() => setSelectedSubmission(sub)}
+                                                                className="p-3 bg-gray-50 text-gray-400 rounded-xl group-hover:bg-[#4a7c59] group-hover:text-white transition-all"
+                                                            >
+                                                                <Eye size={18} />
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            ) : (
+                                                <tr>
+                                                    <td colSpan="6" className="py-40 text-center">
+                                                        <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto mb-6 text-gray-200">
+                                                            <ClipboardList size={32} />
+                                                        </div>
+                                                        <h3 className="text-xl font-bold text-gray-300 italic">Central repository is empty</h3>
+                                                        <p className="text-sm text-gray-400 mt-2">Awaiting first submission from active examination nodes.</p>
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </motion.div>
+                        )}
+                        {activeTab === 'tickets' && (
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                                <div className="flex justify-between items-center mb-10">
+                                    <div>
+                                        <h2 className="text-4xl font-black uppercase tracking-tighter">Support Desk Queue</h2>
+                                        <p className="text-gray-400 mt-2">Manage technical escalations and administrative requests from live nodes.</p>
+                                    </div>
+                                    <div className="px-6 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-3">
+                                        <div className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" />
+                                        Queue: {tickets.length} Active
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 gap-6">
+                                    {tickets.length > 0 ? (
+                                        [...tickets].reverse().map(ticket => (
+                                            <div key={ticket.id} className="bg-white border border-[#e0e0d5] rounded-3xl p-8 flex flex-col md:flex-row gap-8 hover:shadow-xl hover:shadow-black/[0.04] transition-all relative overflow-hidden">
+                                                <div className="absolute top-0 left-0 w-1.5 h-full bg-yellow-500" />
+                                                <div className="md:w-64 border-r border-gray-50 pr-8">
+                                                    <div className="text-[10px] font-bold text-[#4a7c59] uppercase tracking-widest mb-3">Origin Node</div>
+                                                    <div className="text-sm font-bold mb-1">{ticket.studentName}</div>
+                                                    <div className="text-[10px] text-gray-400 font-mono italic mb-4">{ticket.rollNo}</div>
+                                                    <div className="px-3 py-1 bg-yellow-50 text-yellow-600 text-[10px] font-bold rounded-full w-fit uppercase border border-yellow-100">
+                                                        Status: OPEN
+                                                    </div>
+                                                </div>
+                                                <div className="flex-1">
+                                                    <div className="flex justify-between items-start mb-4">
+                                                        <h3 className="text-xl font-bold">{ticket.subject}</h3>
+                                                        <span className="text-[10px] font-mono text-gray-400">{new Date(ticket.timestamp).toLocaleString()}</span>
+                                                    </div>
+                                                    <p className="text-sm text-gray-500 leading-relaxed bg-gray-50 p-5 rounded-2xl italic">"{ticket.message}"</p>
+                                                    <div className="mt-8 flex gap-4">
+                                                        <button className="px-6 py-3 bg-[#1a1a1a] text-white text-xs font-bold rounded-xl hover:bg-black transition-all uppercase tracking-widest flex items-center gap-2">
+                                                            <MessageSquare size={14} /> Dispatch Response
+                                                        </button>
+                                                        <button className="px-6 py-3 bg-white border border-gray-100 text-xs font-bold rounded-xl hover:bg-gray-50 transition-all uppercase tracking-widest">
+                                                            Mark Resolved
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="py-32 text-center bg-white rounded-[40px] border border-dashed border-gray-200">
+                                            <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto mb-6 text-gray-300">
+                                                <MessageSquare size={32} />
+                                            </div>
+                                            <h3 className="text-xl font-bold text-gray-300 italic">Support queue is clear</h3>
+                                            <p className="text-sm text-gray-400 mt-2">No active technical escalations reported from any examination nodes.</p>
+                                        </div>
+                                    )}
                                 </div>
                             </motion.div>
                         )}
@@ -924,6 +1244,146 @@ export default function TrainerConsole() {
                 )}
             </AnimatePresence>
 
+            {/* Evidence Previewer Modal */}
+            <AnimatePresence>
+                {selectedReport && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 backdrop-blur-md p-6">
+                        <div className="w-[800px] bg-white rounded-[40px] shadow-2xl overflow-hidden border border-gray-100">
+                            <div className="p-8 border-b border-gray-50 flex items-center justify-between bg-gray-50/50">
+                                <div>
+                                    <h4 className="text-xl font-bold uppercase tracking-tighter">Neural_Incident_Audit</h4>
+                                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Transaction Node: {selectedReport.id}</p>
+                                </div>
+                                <button onClick={() => setSelectedReport(null)} className="p-3 bg-white rounded-2xl hover:bg-gray-50 transition-all text-gray-400"><X size={20} /></button>
+                            </div>
+                            <div className="p-10">
+                                <div className="grid grid-cols-3 gap-8 mb-10">
+                                    <div className="bg-red-50 p-6 rounded-3xl border border-red-100">
+                                        <div className="text-[9px] font-bold text-red-400 uppercase mb-2">Detection_Class</div>
+                                        <div className="text-lg font-black text-red-600 uppercase italic">{selectedReport.violationType}</div>
+                                    </div>
+                                    <div className="bg-gray-50 p-6 rounded-3xl border border-gray-100">
+                                        <div className="text-[9px] font-bold text-gray-400 uppercase mb-2">Confidence_Score</div>
+                                        <div className="text-lg font-black text-gray-800 uppercase italic">94.82%</div>
+                                    </div>
+                                    <div className="bg-green-50 p-6 rounded-3xl border border-green-100">
+                                        <div className="text-[9px] font-bold text-green-400 uppercase mb-2">Escalation_Status</div>
+                                        <div className="text-lg font-black text-green-600 uppercase italic">SUCCESS</div>
+                                    </div>
+                                </div>
+                                <div className="space-y-4">
+                                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">Integrity_Telemetry_Stream</div>
+                                    <div className="bg-[#1a1a1a] p-8 rounded-[30px] font-mono text-[11px] leading-relaxed text-green-500/80 max-h-[300px] overflow-y-auto">
+                                        <div className="mb-2 text-green-500">[SYSTEM_SYNC] Biometric payload verified...</div>
+                                        <div className="mb-2 text-red-500">[DETECTION] Object_Class: {selectedReport.violationType} identified @ frame 4921</div>
+                                        <div className="mb-2 text-orange-500">[VALIDATION] Multiple vector verification initiated...</div>
+                                        <div className="mb-2 text-red-500">[ESCALATION] Alerting Subject Faculty... OK</div>
+                                        <div className="mb-2 text-red-500">[ESCALATION] Alerting Department HOD... OK</div>
+                                        <div className="mb-2 text-green-500">[PENALTY] Local node frozen for 600s</div>
+                                        <div className="mb-2 text-gray-500">-------------------------------------------</div>
+                                        <div className="mb-2 text-green-300"># TELEMETRY_DATA_HEX: 41 49 5F 50 52 4F 43 54 4F 52_01</div>
+                                        <div className="mb-2 text-green-300"># VECTOR_SCORE: 0.992837192837</div>
+                                        <div className="mb-2 text-green-300"># TIMESTAMP: {selectedReport.timestamp}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="p-8 bg-gray-50 flex justify-end gap-4">
+                                <button onClick={() => setSelectedReport(null)} className="px-8 py-3 bg-white text-gray-500 font-bold rounded-xl text-xs uppercase tracking-widest hover:bg-gray-100">Dismiss</button>
+
+                                {user?.name?.includes("HOD") ? (
+                                    <button
+                                        className="px-8 py-3 bg-[#4a7c59] text-white font-bold rounded-xl text-xs uppercase tracking-widest shadow-lg shadow-[#4a7c59]/20"
+                                        onClick={() => {
+                                            unfreezeStudent(selectedReport.studentId);
+                                            alert(`AUTHORITY_VERIFIED: Resuming node for ${selectedReport.studentName}. Session state restored.`);
+                                            setSelectedReport(null);
+                                        }}
+                                    >
+                                        Resume Secure Node
+                                    </button>
+                                ) : (
+                                    <button
+                                        disabled
+                                        className="px-8 py-3 bg-gray-100 text-gray-300 font-bold rounded-xl text-xs uppercase cursor-not-allowed border border-gray-200"
+                                    >
+                                        HOD_AUTH_REQUIRED
+                                    </button>
+                                )}
+
+                                <button className="px-8 py-3 bg-red-600 text-white font-bold rounded-xl text-xs uppercase tracking-widest shadow-lg shadow-red-200">Invalidate Report</button>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Submission Detail Modal */}
+            <AnimatePresence>
+                {selectedSubmission && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 backdrop-blur-md p-6">
+                        <div className="w-[1000px] max-h-[90vh] bg-white rounded-[40px] shadow-2xl overflow-hidden flex flex-col border border-gray-100">
+                            <div className="p-8 border-b border-gray-50 flex items-center justify-between bg-gray-50/50 shrink-0">
+                                <div>
+                                    <h4 className="text-xl font-bold uppercase tracking-tighter">Academic_Evidence_Hub</h4>
+                                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Transaction Node: {selectedSubmission.id}</p>
+                                </div>
+                                <button onClick={() => setSelectedSubmission(null)} className="p-3 bg-white rounded-2xl hover:bg-gray-50 transition-all text-gray-400"><X size={20} /></button>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto p-10">
+                                <div className="grid grid-cols-4 gap-6 mb-10">
+                                    <div className="p-6 bg-gray-50 rounded-3xl border border-gray-100">
+                                        <div className="text-[9px] font-bold text-gray-400 uppercase mb-2">Candidate</div>
+                                        <div className="text-sm font-black uppercase">{selectedSubmission.studentName}</div>
+                                        <div className="text-[10px] text-gray-400 font-mono mt-1">{selectedSubmission.rollNo}</div>
+                                    </div>
+                                    <div className="p-6 bg-gray-50 rounded-3xl border border-gray-100">
+                                        <div className="text-[9px] font-bold text-gray-400 uppercase mb-2">Assessment</div>
+                                        <div className="text-sm font-black uppercase">{selectedSubmission.examTitle}</div>
+                                        <div className="text-[10px] text-[#4a7c59] font-bold mt-1">VERIFIED_SUBMISSION</div>
+                                    </div>
+                                    <div className="p-6 bg-[#4a7c59]/5 rounded-3xl border border-[#4a7c59]/10">
+                                        <div className="text-[9px] font-bold text-[#4a7c59] uppercase mb-2">Merit_Score</div>
+                                        <div className="text-2xl font-black text-[#4a7c59]">{selectedSubmission.score} / {selectedSubmission.totalMarks}</div>
+                                    </div>
+                                    <div className="p-6 bg-red-50 rounded-3xl border border-red-100">
+                                        <div className="text-[9px] font-bold text-red-400 uppercase mb-2">Neural_Violations</div>
+                                        <div className="text-2xl font-black text-red-600">{typeof selectedSubmission.violations === 'object' ? selectedSubmission.violations.length : selectedSubmission.violations}</div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-8">
+                                    <div className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500 border-b border-gray-100 pb-4">Candidate_Response_Ledger</div>
+
+                                    {Object.entries(selectedSubmission.answers).map(([qId, answer], idx) => (
+                                        <div key={qId} className="space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                                                    <div className="w-5 h-5 rounded bg-gray-100 flex items-center justify-center text-[8px] text-gray-500">{idx + 1}</div>
+                                                    Logic Module: {qId}
+                                                </div>
+                                            </div>
+                                            <div className="bg-[#1a1a1a] p-8 rounded-[30px] font-mono text-xs leading-relaxed text-green-500/80 border border-black shadow-inner">
+                                                <pre className="whitespace-pre-wrap">{answer}</pre>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="p-8 bg-gray-50 border-t border-gray-100 flex justify-end gap-4 shrink-0">
+                                <button onClick={() => setSelectedSubmission(null)} className="px-8 py-3 bg-white text-gray-500 font-bold rounded-xl text-xs uppercase tracking-widest border border-gray-100 hover:bg-gray-100 transition-all">Close Audit</button>
+                                <button
+                                    onClick={() => handleDownloadTranscript(selectedSubmission)}
+                                    className="px-8 py-3 bg-[#4a7c59] text-white font-bold rounded-xl text-xs uppercase tracking-widest shadow-lg shadow-[#4a7c59]/20 flex items-center gap-2"
+                                >
+                                    <Download size={14} /> Download PDF Transcript
+                                </button>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

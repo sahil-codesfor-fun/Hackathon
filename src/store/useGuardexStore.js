@@ -71,6 +71,10 @@ const useGuardexStore = create(
       ],
 
       violations: [],
+      submissions: [],
+      studentAnswers: {}, // examId -> { questionId -> answer }
+      reports: [],
+      tickets: [],
 
       aiState: {
         faceDetected: true,
@@ -83,13 +87,18 @@ const useGuardexStore = create(
       },
 
       // --- ACTIONS ---
-
-      login: (role, name) => {
+      login: (role, name, email = '') => {
         const userId = 'GX-' + Math.random().toString(36).substr(2, 6).toUpperCase();
-        const rollNo = role === 'student' ? `${new Date().getFullYear()}BTCS${Math.floor(Math.random() * 900) + 100}` : null;
+        const rollNo = role === 'student' ? `${new Date().getFullYear()}BTCS${Math.floor(Math.random() * 900) + 100}` : 'DEPT_HEAD';
 
         set({
-          user: { role, name, id: userId, rollNo },
+          user: {
+            id: userId,
+            role,
+            name,
+            email: email || `${name.toLowerCase().replace(' ', '.')}@university.edu`,
+            rollNo
+          },
           isAuthenticated: true,
           currentPage: role === 'admin' ? 'dashboard' : 'portal',
           // Automatically assign student to all mock exams for demo purposes
@@ -238,6 +247,20 @@ const useGuardexStore = create(
       },
 
       unfreeze: () => set(s => ({ session: { ...s.session, isFrozen: false } })),
+      unfreezeStudent: (studentId) => {
+        // In a real app, this would be a socket message or a database update.
+        // For our demo, we'll track frozen students in a global map if we had one.
+        // Since we only have one "session" in the store for the current user,
+        // we'll assume the HOD is unfreezing a student who is currently active.
+        // If we want to support multiple students, we need to store their session state indexed by ID.
+
+        // For now, let's add a mechanism to mark a report as 'resolved_and_unfrozen'
+        set(s => ({
+          reports: s.reports.map(r =>
+            r.studentId === studentId ? { ...r, isResolved: true, unfreezeAction: true } : r
+          )
+        }));
+      },
       updatePenaltyConfig: (updates) => set(s => ({ penaltyConfig: { ...s.penaltyConfig, ...updates } })),
       createExam: (examData) => {
         const totalMarks = examData.questions?.reduce((sum, q) => sum + (parseInt(q.marks) || 0), 0) || examData.totalMarks || 100;
@@ -271,9 +294,56 @@ const useGuardexStore = create(
 
       updateAI: (updates) => set(s => ({ aiState: { ...s.aiState, ...updates } })),
       setCurrentExam: (id) => set({ currentExam: get().exams.find(e => e.id === id) }),
-      submitSession: () => set(s => ({ session: { ...s.session, isSubmitted: true, isActive: false } })),
+
+      saveAnswer: (examId, questionId, answer) => {
+        set(s => ({
+          studentAnswers: {
+            ...s.studentAnswers,
+            [examId]: {
+              ...(s.studentAnswers[examId] || {}),
+              [questionId]: answer
+            }
+          }
+        }));
+      },
+
+      submitSession: () => {
+        const state = get();
+        const { user, currentExam, session, violations, studentAnswers } = state;
+
+        const newSubmission = {
+          id: 'SUB_' + Math.random().toString(36).substr(2, 6).toUpperCase(),
+          studentId: user.id,
+          studentName: user.name,
+          rollNo: user.rollNo,
+          examId: currentExam.id,
+          examTitle: currentExam.title,
+          score: session.marks,
+          totalMarks: currentExam.totalMarks,
+          violations: violations.length,
+          answers: studentAnswers[currentExam.id] || {},
+          timestamp: new Date().toISOString(),
+          status: 'completed'
+        };
+
+        set({
+          submissions: [...state.submissions, newSubmission],
+          session: { ...session, isSubmitted: true, isActive: false }
+        });
+      },
+
       resetSession: () => set(s => ({
-        session: { ...s.session, isActive: false, isSubmitted: false, isFrozen: false, marks: 100 },
+        session: {
+          isActive: false,
+          isSubmitted: false,
+          isFrozen: false,
+          marks: 100,
+          currentQuestion: 0,
+          startTime: null,
+          endTime: null,
+          frozenUntil: null,
+          freezeReason: ''
+        },
         violations: [],
         currentPage: 'portal'
       })),
@@ -291,13 +361,20 @@ const useGuardexStore = create(
           severity,
           timestamp: new Date().toISOString(),
           status: 'transmitted',
-          recipients: ['HOD_OFFICE', 'SUBJECT_FACULTY']
+          recipients: ['HOD_OFFICE', 'SUBJECT_FACULTY'],
+          isResolved: false
         };
         set(s => ({ reports: [newReport, ...s.reports] }));
+      },
+
+      resolveReport: (reportId) => {
+        set(s => ({
+          reports: s.reports.map(r => r.id === reportId ? { ...r, isResolved: true } : r)
+        }));
       }
     }),
     {
-      name: 'guardex-academic-store',
+      name: 'guardex-academic-store-v2',
       storage: createJSONStorage(() => localStorage),
     }
   )

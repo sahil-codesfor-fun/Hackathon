@@ -1,7 +1,7 @@
-'use client';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import useGuardexStore from '@/store/useGuardexStore';
 import { motion, AnimatePresence } from 'framer-motion';
+import Editor from '@monaco-editor/react';
 import {
     Shield, AlertTriangle, Play, Terminal,
     Camera, Mic, Activity, Clock, LogOut,
@@ -21,7 +21,7 @@ const LANGUAGES = [
     { id: 'go', label: 'Go', ext: '.go', template: 'package main\n\nimport "fmt"\n\nfunc main() {\n    fmt.Println("Hello World")\n}' },
     { id: 'ruby', label: 'Ruby', ext: '.rb', template: '# Write your solution here\nputs "Hello World"' },
     { id: 'rust', label: 'Rust', ext: '.rs', template: 'fn main() {\n    println!("Hello World");\n}' },
-    { id: 'kotlin', label: 'Kotlin', ext: '.kt', template: 'fun main() {\n    println("Hello World")\n}' },
+    { id: 'kotlin', label: 'Kotlin', ext: '.kt', template: 'fun main() {\n    println!("Hello World")\n}' },
     { id: 'php', label: 'PHP', ext: '.php', template: '<?php\necho "Hello World\\n";\n?>' },
     { id: 'typescript', label: 'TypeScript', ext: '.ts', template: '// Write your solution here\nconsole.log("Hello World");' },
     { id: 'r', label: 'R', ext: '.r', template: '# Write your solution here\ncat("Hello World\\n")' },
@@ -32,7 +32,7 @@ const LANGUAGES = [
 export default function ExamEnvironment() {
     const {
         user, session, aiState, updateAI, addViolation,
-        violations, penaltyConfig, submitSession, unfreeze, currentExam, resetSession
+        violations, penaltyConfig, submitSession, unfreeze, currentExam, resetSession, saveAnswer
     } = useGuardexStore();
 
     const [selectedLang, setSelectedLang] = useState(LANGUAGES[0]);
@@ -235,11 +235,22 @@ export default function ExamEnvironment() {
             if (session.isFrozen && session.frozenUntil && Date.now() >= session.frozenUntil) {
                 unfreeze();
             }
+
+            // HOD Unfreeze Check
+            if (session.isFrozen && user) {
+                const store = useGuardexStore.getState();
+                const myReport = store.reports.find(r => r.studentId === user.id && r.unfreezeAction);
+                if (myReport) {
+                    unfreeze();
+                    // Optional: mark report as completely resolved so it doesn't unfreeze again
+                    store.resolveReport(myReport.id);
+                }
+            }
         };
         updateTimer();
         const inv = setInterval(updateTimer, 1000);
         return () => clearInterval(inv);
-    }, [session.isActive, session.endTime, session.isFrozen, session.frozenUntil, unfreeze]);
+    }, [session.isActive, session.endTime, session.isFrozen, session.frozenUntil, unfreeze, user]);
 
     // --- DevTools Detection ---
     const [devToolsActive, setDevToolsActive] = useState(false);
@@ -379,26 +390,30 @@ export default function ExamEnvironment() {
                 const isActive = i === activeQ;
                 ctx.fillStyle = isActive ? '#4a7c59' : '#aaa';
                 ctx.font = `${isActive ? '700' : '400'} 12px Inter, system-ui`;
-                ctx.fillText(`${i + 1}. ${qq.title || 'Untitled'}  —  ${qq.marks}m`, 30, y);
+                ctx.fillText(`${i + 1}. ${qq.title || 'Untitled'}  —  ${qq.marks} m`, 30, y);
                 y += 22;
             });
         };
         draw();
     }, [currentExam, activeQ, currentQuestion, questions]);
 
-    // --- Watermark ---
-    useEffect(() => {
-        const drawWatermark = () => {
-            const c = canvasWatermarkRef.current; if (!c) return;
-            const ctx = c.getContext('2d'); c.width = 500; c.height = 1200;
-            ctx.clearRect(0, 0, 500, 1200); ctx.save(); ctx.rotate(-Math.PI / 4);
-            ctx.font = '12px JetBrains Mono'; ctx.fillStyle = 'rgba(74,124,89,0.06)';
-            const text = `${user?.name?.toUpperCase()} // ${user?.rollNo}`;
-            for (let i = -10; i < 10; i++) for (let j = -10; j < 10; j++) ctx.fillText(text, i * 280, j * 140);
-            ctx.restore();
-        };
-        const inv = setInterval(drawWatermark, 1000); return () => clearInterval(inv);
+    // --- Watermark (Optimized to redraw only on window resize or user change) ---
+    const drawWatermark = useCallback(() => {
+        const c = canvasWatermarkRef.current; if (!c) return;
+        const ctx = c.getContext('2d');
+        c.width = 500; c.height = window.innerHeight > 1200 ? window.innerHeight : 1200;
+        ctx.clearRect(0, 0, 500, c.height); ctx.save(); ctx.rotate(-Math.PI / 4);
+        ctx.font = '12px JetBrains Mono'; ctx.fillStyle = 'rgba(74,124,89,0.06)';
+        const text = `${user?.name?.toUpperCase()} // ${user?.rollNo}`;
+        for (let i = -10; i < 15; i++) for (let j = -10; j < 15; j++) ctx.fillText(text, i * 280, j * 140);
+        ctx.restore();
     }, [user]);
+
+    useEffect(() => {
+        drawWatermark();
+        window.addEventListener('resize', drawWatermark);
+        return () => window.removeEventListener('resize', drawWatermark);
+    }, [drawWatermark]);
 
     // --- Webcam Initialization (Robust) ---
     useEffect(() => {
@@ -435,20 +450,24 @@ export default function ExamEnvironment() {
     // --- Face Detection & Gaze Tracking (using coco-ssd) ---
     useEffect(() => {
         let intervalId = null;
-        let model = null;
+        let isAnalyzing = false;
         const initDetection = async () => {
             try {
+                setWebcamStatus('loading_ai');
                 const tf = await import('@tensorflow/tfjs');
                 await tf.setBackend('webgl');
                 await tf.ready();
                 const cocoSsd = await import('@tensorflow-models/coco-ssd');
-                model = await cocoSsd.load({ base: 'lite_mobilenet_v2' });
+                const model = await cocoSsd.load({ base: 'lite_mobilenet_v2' });
                 detectorRef.current = model;
+                setWebcamStatus('active');
 
                 const analyzeFrame = async () => {
+                    if (isAnalyzing) return;
                     const video = videoRef.current;
                     if (!video || video.readyState < 2 || !detectorRef.current) return;
 
+                    isAnalyzing = true;
                     try {
                         const predictions = await detectorRef.current.detect(video);
 
@@ -497,12 +516,10 @@ export default function ExamEnvironment() {
                             const faceWidth = w / videoW;
 
                             let dir = 'center';
-                            // If face is very off-center, they're looking away
-                            if (centerX < 0.25) dir = 'right'; // mirrored camera
+                            if (centerX < 0.25) dir = 'right';
                             else if (centerX > 0.75) dir = 'left';
                             else if (centerY < 0.15) dir = 'up';
                             else if (centerY > 0.75) dir = 'down';
-                            // If face is very small, they might be far/looking away
                             else if (faceWidth < 0.15) dir = 'away';
 
                             setGazeDir(dir);
@@ -520,7 +537,9 @@ export default function ExamEnvironment() {
                             }
                         }
                     } catch (err) {
-                        // Detection frame error, skip
+                        console.error('Frame analysis error:', err);
+                    } finally {
+                        isAnalyzing = false;
                     }
                 };
 
@@ -528,6 +547,7 @@ export default function ExamEnvironment() {
                 intervalId = setInterval(analyzeFrame, 2500);
             } catch (err) {
                 console.error('Detection init error:', err);
+                setWebcamStatus('error');
             }
         };
 
@@ -722,19 +742,51 @@ export default function ExamEnvironment() {
                         )}
                     </AnimatePresence>
 
-                    {/* Code Editor */}
-                    <textarea
-                        value={code}
-                        onChange={e => setCode(e.target.value)}
-                        onPaste={e => { e.preventDefault(); addViolation('paste_attempt', 'Paste blocked in code editor', 'high'); setShowPasteWarning(true); setTimeout(() => setShowPasteWarning(false), 3000); }}
-                        onCopy={e => { e.preventDefault(); addViolation('copy_attempt', 'Copy blocked in code editor', 'medium'); }}
-                        onCut={e => { e.preventDefault(); addViolation('cut_attempt', 'Cut blocked in code editor', 'medium'); }}
-                        onDrop={e => { e.preventDefault(); addViolation('drop_attempt', 'Drag & drop blocked in code editor', 'high'); }}
-                        spellCheck={false}
-                        autoComplete="off"
-                        autoCorrect="off"
-                        className="flex-1 p-6 font-mono text-sm resize-none outline-none leading-relaxed text-gray-800 bg-white"
-                    />
+                    {/* Code Editor - Monaco Implementation */}
+                    <div className="flex-1 min-h-0 relative">
+                        <Editor
+                            height="100%"
+                            language={selectedLang.id === 'cpp' ? 'cpp' : selectedLang.id === 'c' ? 'c' : selectedLang.id === 'python' ? 'python' : selectedLang.id}
+                            theme="vs-light"
+                            value={code}
+                            onChange={(value) => {
+                                setCode(value || '');
+                                saveAnswer(currentExam.id, currentQuestion.id, value || '');
+                            }}
+                            onMount={(editor) => {
+                                // Block copy/paste/cut within Monaco
+                                editor.onKeyDown((e) => {
+                                    if ((e.ctrlKey || e.metaKey) && (e.keyCode === 33 || e.keyCode === 52 || e.keyCode === 54)) {
+                                        e.preventDefault();
+                                        addViolation('prohibited_shortcut', 'Shortcut blocked in secure editor', 'medium');
+                                    }
+                                });
+                                // Block monaco context menu
+                                editor.onContextMenu((e) => {
+                                    e.event.preventDefault();
+                                });
+                            }}
+                            options={{
+                                minimap: { enabled: false },
+                                fontSize: 13,
+                                fontFamily: 'JetBrains Mono, Menlo, Monaco, Courier New, monospace',
+                                lineHeight: 1.6,
+                                padding: { top: 20 },
+                                scrollBeyondLastLine: false,
+                                automaticLayout: true,
+                                contextmenu: false,
+                                copyWithSyntaxHighlighting: false,
+                                readOnly: session.isFrozen,
+                                suggestOnTriggerCharacters: true,
+                                quickSuggestions: true,
+                            }}
+                        />
+                        {/* Security Overlay for Editor */}
+                        <div
+                            className="absolute inset-0 z-10 pointer-events-none"
+                            onPaste={e => { e.preventDefault(); addViolation('paste_attempt', 'Paste blocked in code editor', 'high'); setShowPasteWarning(true); setTimeout(() => setShowPasteWarning(false), 3000); }}
+                        />
+                    </div>
 
                     {/* Output Panel */}
                     <div className="h-[140px] border-t border-[#e0e0d5] bg-gray-50 p-4 overflow-y-auto">
@@ -759,9 +811,9 @@ export default function ExamEnvironment() {
                     <div className="rounded-xl overflow-hidden border border-[#e0e0d5] mb-4 relative">
                         <div className="bg-gray-100 px-3 py-1.5 text-[8px] font-bold text-gray-400 uppercase flex items-center justify-between">
                             <span>Sensory_Feed</span>
-                            <span className={`flex items-center gap-1 ${webcamStatus === 'active' ? 'text-green-500' : webcamStatus === 'error' ? 'text-red-500' : 'text-yellow-500'}`}>
-                                <div className={`h-1.5 w-1.5 rounded-full ${webcamStatus === 'active' ? 'bg-green-500 animate-pulse' : webcamStatus === 'error' ? 'bg-red-500' : 'bg-yellow-500 animate-pulse'}`} />
-                                {webcamStatus === 'active' ? 'LIVE' : webcamStatus === 'error' ? 'ERROR' : 'INIT...'}
+                            <span className={`flex items-center gap-1 ${webcamStatus === 'active' ? 'text-green-500' : (webcamStatus === 'error' ? 'text-red-500' : 'text-orange-500')}`}>
+                                <div className={`h-1.5 w-1.5 rounded-full ${webcamStatus === 'active' ? 'bg-green-500 animate-pulse' : (webcamStatus === 'error' ? 'bg-red-500' : 'bg-orange-500 animate-pulse')}`} />
+                                {webcamStatus === 'active' ? 'LIVE' : webcamStatus === 'error' ? 'ERROR' : webcamStatus === 'loading_ai' ? 'LOADING_AI' : 'INITIALIZING'}
                             </span>
                         </div>
                         <video ref={videoRef} autoPlay muted playsInline className="aspect-video w-full object-cover bg-black" />

@@ -387,7 +387,7 @@ export default function StudentExamPortal() {
                                                 type="text" required
                                                 className="w-full bg-gray-50 border border-gray-100 p-4 rounded-xl outline-[#4a7c59] text-sm"
                                                 placeholder="e.g. Webcam Initialization Failure"
-                                                value={ticketData.subject}
+                                                value={ticketData.subject ?? ''}
                                                 onChange={e => setTicketData({ ...ticketData, subject: e.target.value })}
                                             />
                                         </div>
@@ -397,7 +397,7 @@ export default function StudentExamPortal() {
                                                 required
                                                 className="w-full bg-gray-50 border border-gray-100 p-4 rounded-xl outline-[#4a7c59] text-sm h-32 resize-none"
                                                 placeholder="Please provide specific node errors or symptoms..."
-                                                value={ticketData.message}
+                                                value={ticketData.message ?? ''}
                                                 onChange={e => setTicketData({ ...ticketData, message: e.target.value })}
                                             />
                                         </div>

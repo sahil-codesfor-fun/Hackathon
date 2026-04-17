@@ -110,7 +110,7 @@ export default function LoginPage() {
                                                 type="email"
                                                 placeholder="Enter institutional email..."
                                                 className="w-full bg-gray-50 border border-gray-100 p-3 rounded-xl outline-[#4a7c59] text-xs"
-                                                value={email}
+                                                value={email ?? ''}
                                                 onChange={(e) => setEmail(e.target.value)}
                                             />
                                             <button

@@ -9,15 +9,17 @@ import {
     ShieldAlert, Activity, LayoutDashboard, LogOut,
     FileText, Lock, Eye, Download, Edit3, Calendar,
     UserX, UserCheck, X, GripVertical, AlertTriangle,
-    CheckCircle, BookOpen, Code2, Hash, ArrowLeft, Shield, MessageSquare, ClipboardList, Trophy, Mail, User
+    CheckCircle, BookOpen, Code2, Hash, ArrowLeft, Shield, MessageSquare, ClipboardList, Trophy, Mail, User, Radio
 } from 'lucide-react';
+import AdminCommandCenter from './AdminCommandCenter';
 
 export default function TrainerConsole() {
     const {
         user, exams, violations, reports, tickets, submissions,
-        penaltyConfig, updatePenaltyConfig, createExam, updateExam, deleteExam, logout, resolveReport, unfreezeStudent
+        penaltyConfig, updatePenaltyConfig, createExam, updateExam, deleteExam, logout, resolveReport, unfreezeStudent,
+        classHierarchy
     } = useGuardexStore();
-    const [selectedReport, setSelectedReport] = useState(null);
+    const [selectedReport, setSelectedRepor] = useState(null);
     const [activeTab, setActiveTab] = useState('overview');
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [editingExam, setEditingExam] = useState(null);
@@ -36,6 +38,7 @@ export default function TrainerConsole() {
         aiProctoringEnabled: true,
         subjectFaculty: '',
         hodInCharge: 'HOD_Computer_Science',
+        targetClassIds: [],
         questions: [{ ...emptyQuestion, id: `q_${Date.now()}` }]
     };
     const [formData, setFormData] = useState({ ...emptyExam });
@@ -200,6 +203,7 @@ Audit Status: VERIFIED
                         { id: 'vault', icon: ShieldAlert, label: 'Escalation Vault' },
                         { id: 'submissions', icon: ClipboardList, label: 'Academic Records' },
                         { id: 'leaderboard', icon: Trophy, label: 'Leaderboard' },
+                        { id: 'command_center', icon: Radio, label: 'Command Center' },
                         { id: 'analytics', icon: BarChart3, label: 'Batch Analytics' },
                         { id: 'tickets', icon: MessageSquare, label: 'Support Desk' },
                         { id: 'settings', icon: Settings, label: 'Global Settings' }
@@ -598,7 +602,7 @@ Audit Status: VERIFIED
                                                         onClick={() => resolveReport(report.id)}
                                                         className="px-4 py-2 bg-gray-50 hover:bg-gray-100 rounded-xl text-[9px] font-bold uppercase tracking-widest text-[#4a7c59] transition-all flex items-center gap-2 border border-transparent hover:border-[#4a7c59]/20"
                                                     >
-                                                        <button className="text-[10px] text-gray-400 hover:text-black font-bold uppercase tracking-widest">Mark as Resolved</button>
+                                                        Mark as Resolved
                                                     </button>
                                                 </div>
                                             </motion.div>
@@ -794,7 +798,7 @@ Audit Status: VERIFIED
                                                 </div>
                                                 <input
                                                     type="number" min={item.min} max={item.max}
-                                                    value={penaltyConfig[item.key]}
+                                                    value={penaltyConfig[item.key] ?? ''}
                                                     onChange={e => updatePenaltyConfig({ [item.key]: parseInt(e.target.value) || item.min })}
                                                     className="w-20 px-4 py-2 bg-gray-50 border border-gray-100 rounded-lg text-sm font-bold text-[#4a7c59] text-center outline-[#4a7c59]"
                                                 />
@@ -845,6 +849,9 @@ Audit Status: VERIFIED
                                     </button>
                                 </div>
                             </motion.div>
+                        )}
+                        {activeTab === 'command_center' && (
+                            <AdminCommandCenter />
                         )}
                         {activeTab === 'submissions' && (
                             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
@@ -1044,7 +1051,7 @@ Audit Status: VERIFIED
                                                 type="text" required
                                                 className="w-full bg-gray-50 border border-gray-100 p-3.5 rounded-xl outline-[#4a7c59] text-sm"
                                                 placeholder="e.g. Advanced Computer Architecture Final"
-                                                value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })}
+                                                value={formData.title ?? ''} onChange={e => setFormData({ ...formData, title: e.target.value })}
                                             />
                                         </div>
                                         <div className="grid grid-cols-2 gap-5">
@@ -1054,7 +1061,7 @@ Audit Status: VERIFIED
                                                     type="text" required
                                                     className="w-full bg-gray-50 border border-gray-100 p-3.5 rounded-xl outline-[#4a7c59] text-sm"
                                                     placeholder="B.Tech SEM VI"
-                                                    value={formData.course} onChange={e => setFormData({ ...formData, course: e.target.value })}
+                                                    value={formData.course ?? ''} onChange={e => setFormData({ ...formData, course: e.target.value })}
                                                 />
                                             </div>
                                             <div>
@@ -1063,7 +1070,7 @@ Audit Status: VERIFIED
                                                     type="text" required
                                                     className="w-full bg-gray-50 border border-gray-100 p-3.5 rounded-xl outline-[#4a7c59] text-sm"
                                                     placeholder="e.g. FAC_DR_SHARMA"
-                                                    value={formData.subjectFaculty} onChange={e => setFormData({ ...formData, subjectFaculty: e.target.value })}
+                                                    value={formData.subjectFaculty ?? ''} onChange={e => setFormData({ ...formData, subjectFaculty: e.target.value })}
                                                 />
                                             </div>
                                         </div>
@@ -1073,7 +1080,7 @@ Audit Status: VERIFIED
                                                 <input
                                                     type="number" required min="5" max="600"
                                                     className="w-full bg-gray-50 border border-gray-100 p-3.5 rounded-xl outline-[#4a7c59] text-sm"
-                                                    value={formData.duration} onChange={e => setFormData({ ...formData, duration: parseInt(e.target.value) || 60 })}
+                                                    value={formData.duration ?? ''} onChange={e => setFormData({ ...formData, duration: parseInt(e.target.value) || 60 })}
                                                 />
                                             </div>
                                             <div>
@@ -1081,7 +1088,7 @@ Audit Status: VERIFIED
                                                 <input
                                                     type="text" disabled
                                                     className="w-full bg-gray-100 border border-gray-100 p-3.5 rounded-xl text-sm italic text-gray-400 cursor-not-allowed"
-                                                    value={formData.hodInCharge}
+                                                    value={formData.hodInCharge ?? ''}
                                                 />
                                             </div>
                                         </div>
@@ -1090,7 +1097,7 @@ Audit Status: VERIFIED
                                             <textarea
                                                 className="w-full bg-gray-50 border border-gray-100 p-3.5 rounded-xl outline-[#4a7c59] h-20 text-sm resize-none"
                                                 placeholder="Brief description of the assessment..."
-                                                value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })}
+                                                value={formData.description ?? ''} onChange={e => setFormData({ ...formData, description: e.target.value })}
                                             />
                                         </div>
                                     </div>
@@ -1106,7 +1113,7 @@ Audit Status: VERIFIED
                                                 <input
                                                     type="datetime-local"
                                                     className="w-full bg-gray-50 border border-gray-100 p-3.5 rounded-xl outline-[#4a7c59] text-sm"
-                                                    value={formData.startTime} onChange={e => setFormData({ ...formData, startTime: e.target.value })}
+                                                    value={formData.startTime ?? ''} onChange={e => setFormData({ ...formData, startTime: e.target.value })}
                                                 />
                                             </div>
                                             <div>
@@ -1114,7 +1121,7 @@ Audit Status: VERIFIED
                                                 <input
                                                     type="datetime-local"
                                                     className="w-full bg-gray-50 border border-gray-100 p-3.5 rounded-xl outline-[#4a7c59] text-sm"
-                                                    value={formData.endTime} onChange={e => setFormData({ ...formData, endTime: e.target.value })}
+                                                    value={formData.endTime ?? ''} onChange={e => setFormData({ ...formData, endTime: e.target.value })}
                                                 />
                                             </div>
                                         </div>
@@ -1142,6 +1149,60 @@ Audit Status: VERIFIED
                                             >
                                                 <div className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-all ${formData.aiProctoringEnabled ? 'left-7' : 'left-0.5'}`} />
                                             </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Class Scope (PRD §9) */}
+                                    <div className="space-y-5">
+                                        <div className="text-[10px] font-bold text-[#4a7c59] uppercase tracking-widest flex items-center gap-2">
+                                            <Hash size={12} /> Class Scope (Target Sections)
+                                        </div>
+                                        <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100">
+                                            <div className="text-xs text-gray-500 mb-4">
+                                                Select which sections can access this assessment. Leave empty to allow all students.
+                                            </div>
+                                            <div className="space-y-2">
+                                                {classHierarchy?.sections?.map(section => {
+                                                    const batch = classHierarchy.batches?.find(b => b.id === section.batch);
+                                                    const isSelected = formData.targetClassIds?.includes(section.id);
+                                                    return (
+                                                        <button
+                                                            key={section.id}
+                                                            type="button"
+                                                            onClick={() => {
+                                                                const current = formData.targetClassIds || [];
+                                                                const updated = isSelected
+                                                                    ? current.filter(id => id !== section.id)
+                                                                    : [...current, section.id];
+                                                                setFormData({ ...formData, targetClassIds: updated });
+                                                            }}
+                                                            className={`w-full flex items-center justify-between p-3 rounded-xl border transition-all text-sm ${isSelected
+                                                                ? 'bg-[#4a7c59]/10 border-[#4a7c59]/30 text-[#4a7c59] font-bold'
+                                                                : 'bg-white border-gray-100 text-gray-600 hover:border-gray-200'
+                                                                }`}
+                                                        >
+                                                            <div className="flex items-center gap-3">
+                                                                <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center text-[10px] ${isSelected ? 'bg-[#4a7c59] border-[#4a7c59] text-white' : 'border-gray-300'
+                                                                    }`}>
+                                                                    {isSelected && <CheckCircle size={12} />}
+                                                                </div>
+                                                                <div>
+                                                                    <span className="font-medium">{section.name}</span>
+                                                                    <span className="text-[10px] text-gray-400 ml-2">
+                                                                        ({batch?.id || section.batch} • {section.strength} students)
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                            <span className="text-[9px] font-mono text-gray-400">{section.id}</span>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                            {formData.targetClassIds?.length > 0 && (
+                                                <div className="mt-4 text-[10px] font-bold text-[#4a7c59]">
+                                                    ✓ Scoped to {formData.targetClassIds.length} section(s)
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
 
@@ -1191,7 +1252,7 @@ Audit Status: VERIFIED
                                                                 type="text" required
                                                                 className="w-full bg-white border border-gray-100 p-3 rounded-lg outline-[#4a7c59] text-sm"
                                                                 placeholder="e.g. Pipeline Hazards Analysis"
-                                                                value={q.title} onChange={e => updateQuestion(idx, 'title', e.target.value)}
+                                                                value={q.title ?? ''} onChange={e => updateQuestion(idx, 'title', e.target.value)}
                                                             />
                                                         </div>
                                                         <div>
@@ -1199,7 +1260,7 @@ Audit Status: VERIFIED
                                                             <input
                                                                 type="number" required min="1" max="500"
                                                                 className="w-full bg-white border border-gray-100 p-3 rounded-lg outline-[#4a7c59] text-sm"
-                                                                value={q.marks} onChange={e => updateQuestion(idx, 'marks', parseInt(e.target.value) || 0)}
+                                                                value={q.marks ?? ''} onChange={e => updateQuestion(idx, 'marks', parseInt(e.target.value) || 0)}
                                                             />
                                                         </div>
                                                     </div>
@@ -1208,7 +1269,7 @@ Audit Status: VERIFIED
                                                         <textarea
                                                             className="w-full bg-white border border-gray-100 p-3 rounded-lg outline-[#4a7c59] h-16 text-sm resize-none"
                                                             placeholder="Detailed instructions for this question..."
-                                                            value={q.description} onChange={e => updateQuestion(idx, 'description', e.target.value)}
+                                                            value={q.description ?? ''} onChange={e => updateQuestion(idx, 'description', e.target.value)}
                                                         />
                                                     </div>
                                                     <div>
@@ -1216,7 +1277,7 @@ Audit Status: VERIFIED
                                                         <textarea
                                                             className="w-full bg-white border border-gray-100 p-3 rounded-lg outline-[#4a7c59] h-20 text-xs font-mono resize-none"
                                                             placeholder="# Starter code template for students..."
-                                                            value={q.template} onChange={e => updateQuestion(idx, 'template', e.target.value)}
+                                                            value={q.template ?? ''} onChange={e => updateQuestion(idx, 'template', e.target.value)}
                                                         />
                                                     </div>
                                                 </div>

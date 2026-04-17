@@ -45,6 +45,12 @@ GUARDEX is a comprehensive, state-of-the-art proctoring platform designed for mo
 *   **Batch Analytics**: High-level overview of class performance and integrity metrics.
 *   **Emergency Freeze**: Global lockdown capability to pause all sessions in the event of a platform-wide breach.
 
+### 7. AI Student Support Assistant (Chatbase Integrated)
+*   **Context-Aware Help**: A 24/7 AI chatbot trained specifically on the Guardex Institutional Knowledge Base.
+*   **Instant Rule Queries**: Students can ask about penalty durations, IDE support, or what to do in case of network failure WITHOUT leaving the exam environment.
+*   **Proactive Integrity Coaching**: The AI provides guidance on maintaining focus and avoiding accidental breaches.
+*   **Seamless Integration**: Custom Cyber-Academic UI that fits perfectly into the proctoring dashboard.
+
 ---
 
 ## ⚒️ Technical Infrastructure

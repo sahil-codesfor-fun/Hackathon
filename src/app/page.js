@@ -20,15 +20,19 @@ export default function Home() {
 
   // Student flow (PRD Phase 1)
   if (user.role === 'student') {
+    let content;
     switch (currentPage) {
       case 'wizard':
-        return <PermissionWizard />;
+        content = <PermissionWizard />;
+        break;
       case 'exam':
-        return <ExamEnvironment />;
+        content = <ExamEnvironment />;
+        break;
       case 'portal':
       default:
-        return <StudentExamPortal />;
+        content = <StudentExamPortal />;
     }
+    return content;
   }
 
   return <LoginPage />;

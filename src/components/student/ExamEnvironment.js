@@ -8,8 +8,9 @@ import {
     Lock, AlertOctagon, UserCheck,
     RefreshCcw, Loader2, FileCode, Server,
     Maximize, Eye, Info, ChevronDown, Code2,
-    Clipboard, Ban, MonitorUp, EyeOff, Smartphone
+    Clipboard, Ban, MonitorUp, EyeOff, Smartphone, Waves
 } from 'lucide-react';
+import { AIBrawler } from '@/engine/AIBrawler';
 
 const LANGUAGES = [
     { id: 'python', label: 'Python', ext: '.py', template: '# Write your solution here\ndef main():\n    print("Hello World")\n\nif __name__ == "__main__":\n    main()' },
@@ -32,7 +33,8 @@ const LANGUAGES = [
 export default function ExamEnvironment() {
     const {
         user, session, aiState, updateAI, addViolation,
-        violations, penaltyConfig, submitSession, unfreeze, currentExam, resetSession, saveAnswer
+        violations, penaltyConfig, submitSession, unfreeze, currentExam, resetSession, saveAnswer,
+        engineState
     } = useGuardexStore();
 
     const [selectedLang, setSelectedLang] = useState(LANGUAGES[0]);
@@ -57,6 +59,7 @@ export default function ExamEnvironment() {
     const [gazeWarning, setGazeWarning] = useState(false);
     const [noFaceCount, setNoFaceCount] = useState(0);
     const [phoneWarning, setPhoneWarning] = useState(false);
+    const [lastScreenHash, setLastScreenHash] = useState(null);
 
     const videoRef = useRef(null);
     const webcamVideoRef = useRef(null);
@@ -171,7 +174,7 @@ export default function ExamEnvironment() {
         return () => document.removeEventListener('keydown', blockKeys);
     }, []);
 
-    // --- Auto Fullscreen on Mount ---
+    // --- Auto Fullscreen and AIBrawler Start ---
     useEffect(() => {
         const enterFs = async () => {
             try {
@@ -180,11 +183,18 @@ export default function ExamEnvironment() {
                     setIsFullscreen(true);
                 }
             } catch (e) {
-                // user may need to click the button
+                console.log('Fullscreen rejected');
             }
         };
+
         if (session.isActive) enterFs();
-    }, [session.isActive]);
+
+        const brawler = new AIBrawler({
+            onViolation: (type, payload) => addViolation(type, `Browser AI Assistant detected [${payload.key || payload.type}]`, 'high', payload)
+        });
+        brawler.start();
+        return () => brawler.stop();
+    }, [session.isActive, addViolation]);
 
     // --- Run Code via OneCompiler API ---
     const handleRunCode = useCallback(async () => {
@@ -281,20 +291,35 @@ export default function ExamEnvironment() {
                 analyser = audioCtx.createAnalyser();
                 const source = audioCtx.createMediaStreamSource(stream);
                 source.connect(analyser);
+
+                // Human voice frequency analysis (300Hz - 3400Hz)
+                const voiceBandStart = Math.floor(300 / (audioCtx.sampleRate / 2) * analyser.frequencyBinCount);
+                const voiceBandEnd = Math.floor(3400 / (audioCtx.sampleRate / 2) * analyser.frequencyBinCount);
+
                 analyser.fftSize = 256;
                 const dataArray = new Uint8Array(analyser.frequencyBinCount);
-                // Check audio every 3 seconds instead of every frame
+
                 intervalId = setInterval(() => {
                     analyser.getByteFrequencyData(dataArray);
+
+                    // Total energy
                     const avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+
+                    // Voice band energy (PRD v2.1 Audio Anomaly)
+                    const voiceEnergy = dataArray.slice(voiceBandStart, voiceBandEnd).reduce((a, b) => a + b, 0) / (voiceBandEnd - voiceBandStart);
+
                     setMicLevel(avg);
                     const now = Date.now();
-                    if (avg > penaltyConfig.audioSensitivity && now - audioSpikeRef.current > 10000) {
+
+                    if (voiceEnergy > 50 && now - audioSpikeRef.current > 15000) {
                         audioSpikeRef.current = now;
-                        addViolation('audio_spike', `Loud noise detected (${Math.round(avg)}dB) — possible verbal communication`, 'medium');
+                        addViolation('audio_second_voice', `Conversational speech patterns detected (${Math.round(voiceEnergy)}) — audio clip saved for faculty review`, 'medium');
+                    } else if (avg > penaltyConfig.audioSensitivity && now - audioSpikeRef.current > 10000) {
+                        audioSpikeRef.current = now;
+                        addViolation('audio_spike', `Loud ambient noise detected (${Math.round(avg)}dB)`, 'low');
                     }
                 }, 3000);
-            } catch (e) { }
+            } catch (e) { console.error('Audio calibration failed:', e); }
         };
         initAudio();
         return () => { if (audioCtx) audioCtx.close(); if (stream) stream.getTracks().forEach(t => t.stop()); if (intervalId) clearInterval(intervalId); };
@@ -473,7 +498,8 @@ export default function ExamEnvironment() {
 
                         // Count persons
                         const persons = predictions.filter(p => p.class === 'person' && p.score > 0.5);
-                        const phones = predictions.filter(p => (p.class === 'cell phone' || p.class === 'book') && p.score > 0.4);
+                        // Phones / Device Detection (v2.1 Hardware Guard)
+                        const phones = predictions.filter(p => (p.class === 'cell phone' || p.class === 'remote' || p.class === 'laptop') && p.score > 0.4);
                         const count = persons.length;
                         setFaceCount(count);
                         updateAI({ faceCount: count, faceDetected: count > 0 });
@@ -481,7 +507,7 @@ export default function ExamEnvironment() {
                         // Phone detected in frame
                         if (phones.length > 0) {
                             setPhoneWarning(true);
-                            addViolation('phone_detected', `Mobile phone/book detected in camera frame (${phones[0].class})`, 'critical');
+                            addViolation('phone_detected', `Hardware device [${phones[0].class}] detected in camera frame.`, 'critical', { device: phones[0].class });
                         }
 
                         // No person detected
@@ -501,9 +527,9 @@ export default function ExamEnvironment() {
                             if (phones.length === 0) setPhoneWarning(false);
                         }
 
-                        // Multiple persons
+                        // Multiple persons (v2.1 Identity Guard)
                         if (count > 1) {
-                            addViolation('multiple_faces', `${count} persons detected \u2014 unauthorized person nearby`, 'critical');
+                            addViolation('second_student_in_frame', `Security Alert: ${count} persons detected. Unauthorized presence detected in frame.`, 'critical');
                         }
 
                         // Gaze direction from person bounding box position
@@ -731,7 +757,7 @@ export default function ExamEnvironment() {
                                 <div className="p-3">
                                     <div className="text-[9px] font-bold text-gray-400 uppercase mb-1">Standard_Input (stdin)</div>
                                     <textarea
-                                        value={stdin}
+                                        value={stdin ?? ''}
                                         onChange={e => setStdin(e.target.value)}
                                         placeholder="Enter input for your program..."
                                         spellCheck={false}
@@ -748,7 +774,7 @@ export default function ExamEnvironment() {
                             height="100%"
                             language={selectedLang.id === 'cpp' ? 'cpp' : selectedLang.id === 'c' ? 'c' : selectedLang.id === 'python' ? 'python' : selectedLang.id}
                             theme="vs-light"
-                            value={code}
+                            value={code ?? ''}
                             onChange={(value) => {
                                 setCode(value || '');
                                 saveAnswer(currentExam.id, currentQuestion.id, value || '');
@@ -836,6 +862,42 @@ export default function ExamEnvironment() {
                     </div>
 
                     <div className="space-y-3">
+                        {/* Engine Decision State */}
+                        <div className="bg-[#1a1a1a] border border-gray-700 p-4 rounded-xl">
+                            <div className="text-[9px] font-bold text-green-400 uppercase mb-3 flex items-center gap-1.5">
+                                <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                                Engine_v2.0
+                            </div>
+                            <div className="space-y-2">
+                                <div className="flex justify-between text-[10px]">
+                                    <span className="text-gray-500">ACTIVE_RULE:</span>
+                                    <span className={`font-mono font-bold ${engineState?.activeRule ? 'text-red-400' : 'text-green-400'}`}>
+                                        {engineState?.activeRule || 'NONE'}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between text-[10px]">
+                                    <span className="text-gray-500">LAST_ACTION:</span>
+                                    <span className={`font-bold uppercase ${engineState?.lastDecision?.action === 'terminate' ? 'text-red-500' :
+                                        engineState?.lastDecision?.action === 'freeze' ? 'text-orange-400' :
+                                            engineState?.lastDecision?.action === 'flag' ? 'text-yellow-400' :
+                                                'text-green-400'
+                                        }`}>
+                                        {engineState?.lastDecision?.action || 'CLEAN'}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between text-[10px]">
+                                    <span className="text-gray-500">EVENTS:</span>
+                                    <span className="text-gray-300 font-mono">{engineState?.totalProcessedEvents || 0}</span>
+                                </div>
+                                <div className="flex justify-between text-[10px]">
+                                    <span className="text-gray-500">AGENT:</span>
+                                    <span className={`font-bold ${engineState?.agentHeartbeat ? 'text-green-400' : 'text-red-500 animate-pulse'}`}>
+                                        {engineState?.agentHeartbeat ? 'CONNECTED' : 'LOST'}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
                         {/* AI Telemetry */}
                         <div className="bg-white border border-[#e0e0d5] p-4 rounded-xl">
                             <div className="text-[9px] font-bold text-gray-400 uppercase mb-3">AI_Telemetry</div>
@@ -902,7 +964,13 @@ export default function ExamEnvironment() {
                             <div className="text-[9px] font-bold text-gray-400 uppercase mb-3">{`Violation_Log [${violations.length}]`}</div>
                             <div className="space-y-2 max-h-[200px] overflow-y-auto">
                                 {violations.map(v => (
-                                    <div key={v.id} className="text-[9px] border-b border-gray-50 py-1.5"><span className="text-red-500 font-bold uppercase">{v.type}</span><div className="text-gray-400 mt-0.5">{v.description}</div></div>
+                                    <div key={v.id} className="text-[9px] border-b border-gray-50 py-1.5">
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="text-red-500 font-bold uppercase">{v.type}</span>
+                                            {v.engineRule && <span className="text-[8px] font-mono px-1 py-0.5 bg-gray-100 rounded text-gray-500">{v.engineRule}</span>}
+                                        </div>
+                                        <div className="text-gray-400 mt-0.5">{v.description}</div>
+                                    </div>
                                 ))}
                             </div>
                         </div>
@@ -996,7 +1064,7 @@ export default function ExamEnvironment() {
                                 </p>
                                 <div className="flex justify-between items-center text-[10px] font-bold text-red-400 uppercase">
                                     <span>Locked Until:</span>
-                                    <span className="font-mono text-red-600">{new Date(session.frozenUntil).toLocaleTimeString()}</span>
+                                    <span className="font-mono text-red-600">{session.frozenUntil ? new Date(session.frozenUntil).toLocaleTimeString() : 'INDEFINITE'}</span>
                                 </div>
                             </div>
                             <div className="text-[10px] text-gray-400 uppercase leading-relaxed font-medium">
